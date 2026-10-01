@@ -1,0 +1,30 @@
+{
+  "name": "project-aegis",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Project Aegis — Full-stack secret scanning & SafeLink platform",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "^6.39.7",
+    "@supabase/supabase-js": "^2.117.2",
+    "lucide-react": "^0.545.0",
+    "motion": "^13.5.0",
+    "next": "^15.5.27",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.6.1",
+    "postcss": "^8.5.28",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.6.0"
+  }
+}

@@ -3,9 +3,12 @@
 ==============================================================================
 PROJECT AEGIS: PRE-COMMIT SECURITY HOOK & DEVELOPER SECRET AUDITOR
 Zero External Dependencies (Pure Python Standard Library)
+
 Usage:
-  python aegis.py             # Pre-commit staged diff inspection
-  python aegis.py --fix       # Auto-extract leaked secrets to .env
+  python3 cli/aegis.py             # Pre-commit staged diff inspection
+  python3 cli/aegis.py --fix       # Auto-extract leaked secrets to .env
+  python3 cli/aegis.py --install   # Install the Git pre-commit hook
+  python3 cli/aegis.py --export    # Write a timestamped JSON audit report
 ==============================================================================
 """
 
@@ -14,10 +17,15 @@ import os
 import re
 import math
 import json
+import uuid
+import stat
+import shutil
+import hashlib
 import argparse
 import subprocess
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 
 # ANSI Cyber-Luxe Color Codes
 CYAN = "\033[96m"
@@ -26,6 +34,13 @@ GREEN = "\033[92m"
 YELLOW = "\033[93m"
 BOLD = "\033[1m"
 RESET = "\033[0m"
+
+# Marker embedded in the installed hook so re-installs are idempotent.
+HOOK_MARKER = "PROJECT_AEGIS_GITSHIELD_HOOK"
+SCHEMA_VERSION = "1.0"
+
+# Absolute path to this script, used to compute the hook's relative invocation.
+SCRIPT_PATH = os.path.abspath(__file__)
 
 # Core Local Signatures (Offline Fallback Engine)
 LOCAL_PATTERNS = [
@@ -59,6 +74,16 @@ def redact_token(token: str) -> str:
         return "********"
     masked_length = min(len(token) - 8, 20)
     return f"{token[:4]}{'*' * masked_length}{token[-4:]}"
+
+
+def sha256_hex(data: str) -> str:
+    """SHA-256 fingerprint (hex) of a UTF-8 string."""
+    return hashlib.sha256(data.encode("utf-8")).hexdigest()
+
+
+def utc_timestamp() -> str:
+    """ISO-8601 UTC timestamp without microseconds."""
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 def get_staged_diff() -> str:
@@ -167,7 +192,7 @@ def apply_remediation(findings):
     env_lines = []
     for i, finding in enumerate(findings):
         var_name = f"AEGIS_SECRET_{i+1}"
-        env_lines.append(f"{var_name}=\"{finding['raw']}\"")
+        env_lines.append(f'{var_name}="{finding["raw"]}"')
 
         # Replace in targeted file
         target_file = finding["file"]
@@ -208,16 +233,195 @@ def print_banner():
     print(f"{RESET}")
 
 
+def print_shield_badge(message: str):
+    """Prints the ASCII shield verification badge."""
+    print(f"{GREEN}{BOLD}")
+    print("   +==================================================+")
+    print("   |    ___   ___   ___  ___  ___                     |")
+    print("   |   / _ \\ / _ \\ / _ \\/ __|/ __|                    |")
+    print("   |  | |_| | |_| |  _|\\__ \\\\__ \\                    |")
+    print("   |   \\___/ \\___/ \\___|___/|___/                    |")
+    print("   |                                                  |")
+    print(f"   |   {message:<45}|")
+    print("   +==================================================+")
+    print(f"{RESET}")
+
+
+# ----------------------------------------------------------------------------
+# MILESTONE: ONE-COMMAND PRE-COMMIT HOOK INSTALLER
+# ----------------------------------------------------------------------------
+
+def detect_git_root():
+    """Returns the absolute path to the current Git repository root, or None."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True
+        )
+        root = result.stdout.strip()
+        return root or None
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        return None
+
+
+def resolve_hooks_dir(git_root: str) -> str:
+    """Resolves the hooks directory (worktree-safe) via git rev-parse."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-path", "hooks"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            check=True,
+            cwd=git_root
+        )
+        hooks_path = result.stdout.strip()
+        if hooks_path:
+            return os.path.abspath(os.path.join(git_root, hooks_path))
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    return os.path.join(git_root, ".git", "hooks")
+
+
+def build_hook_script(relative_script_path: str) -> str:
+    """Builds the POSIX shell pre-commit hook that runs this auditor."""
+    return f"""#!/bin/sh
+# {HOOK_MARKER}
+# Project Aegis GitShield pre-commit guard (auto-installed by `aegis.py --install`).
+# Restore any previous hook from pre-commit.aegis-backup if needed.
+set -e
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo .)"
+cd "$REPO_ROOT"
+exec python3 "{relative_script_path}" "$@"
+"""
+
+
+def install_hook():
+    """Installs the GitShield pre-commit hook, backing up any existing hook."""
+    git_root = detect_git_root()
+    if not git_root:
+        print(f"{RED}[Aegis Error] Not inside a Git repository. Run 'git init' first.{RESET}")
+        sys.exit(1)
+
+    hooks_dir = resolve_hooks_dir(git_root)
+    os.makedirs(hooks_dir, exist_ok=True)
+
+    pre_commit_path = os.path.join(hooks_dir, "pre-commit")
+    backup_path = os.path.join(hooks_dir, "pre-commit.aegis-backup")
+    relative_script = os.path.relpath(SCRIPT_PATH, git_root)
+
+    # Back up a foreign existing hook before overwriting it.
+    if os.path.exists(pre_commit_path):
+        try:
+            with open(pre_commit_path, "r", encoding="utf-8", errors="replace") as f:
+                existing = f.read()
+        except OSError:
+            existing = ""
+
+        if HOOK_MARKER in existing:
+            print(f"{CYAN}[Aegis] Existing GitShield hook detected - refreshing it.{RESET}")
+        else:
+            if os.path.exists(backup_path):
+                stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+                backup_path = f"{backup_path}.{stamp}"
+            shutil.copy2(pre_commit_path, backup_path)
+            print(f"{YELLOW}[Aegis] Backed up existing pre-commit hook -> {backup_path}{RESET}")
+
+    hook_script = build_hook_script(relative_script)
+    with open(pre_commit_path, "w", encoding="utf-8") as f:
+        f.write(hook_script)
+
+    # Grant execution permissions (rwxr-xr-x).
+    current_mode = os.stat(pre_commit_path).st_mode
+    os.chmod(
+        pre_commit_path,
+        current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
+    )
+
+    print_banner()
+    print(f"{GREEN}{BOLD}[Aegis] GitShield pre-commit hook installed successfully.{RESET}")
+    print(f"  {CYAN}Repo root :{RESET} {git_root}")
+    print(f"  {CYAN}Hook file :{RESET} {pre_commit_path}")
+    print(f"  {CYAN}Invokes   :{RESET} python3 {relative_script}")
+    print()
+    print_shield_badge("AEGIS HOOK INSTALLED - COMMITS GUARDED")
+
+
+# ----------------------------------------------------------------------------
+# MILESTONE: TIMESTAMPED AUDIT REPORT EXPORT
+# ----------------------------------------------------------------------------
+
+def build_audit_payload(diff_text: str, findings):
+    """Builds a shareable, redacted audit payload (never persists raw secrets)."""
+    redacted_findings = [
+        {
+            "name": finding["name"],
+            "file": finding.get("file", "unknown"),
+            "redacted": finding["redacted"],
+            "entropy": finding.get("entropy", 0.0),
+            "raw_sha256": sha256_hex(finding["raw"]) if finding.get("raw") else None,
+        }
+        for finding in findings
+    ]
+    highest_entropy = max(
+        (finding.get("entropy", 0.0) for finding in findings),
+        default=0.0
+    )
+    return {
+        "schema_version": SCHEMA_VERSION,
+        "tool": "Project Aegis GitShield CLI",
+        "scan_id": str(uuid.uuid4()),
+        "generated_at": utc_timestamp(),
+        "fingerprint_sha256": sha256_hex(diff_text),
+        "staged_diff_bytes": len(diff_text.encode("utf-8")),
+        "findings_count": len(findings),
+        "highest_entropy": round(highest_entropy, 3),
+        "findings": redacted_findings,
+        "remediation_commands": [
+            "python3 cli/aegis.py --install",
+            "python3 cli/aegis.py --fix",
+            "python3 cli/aegis.py --export",
+        ],
+    }
+
+
+def export_report(diff_text: str, findings):
+    """Writes a timestamped aegis-audit-report JSON file into the cwd."""
+    payload = build_audit_payload(diff_text, findings)
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    filename = f"aegis-audit-report-{stamp}.json"
+
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    print_banner()
+    print(f"{GREEN}{BOLD}[Aegis] Audit report exported.{RESET}")
+    print(f"  {CYAN}File       :{RESET} {os.path.abspath(filename)}")
+    print(f"  {CYAN}Scan ID    :{RESET} {payload['scan_id']}")
+    print(f"  {CYAN}Fingerprint:{RESET} {payload['fingerprint_sha256']}")
+    print(f"  {CYAN}Findings   :{RESET} {payload['findings_count']}")
+    print()
+    print_shield_badge("AEGIS AUDIT EXPORTED - TELEMETRY SEALED")
+    return filename
+
+
 def main():
     parser = argparse.ArgumentParser(description="Project Aegis GitShield Pre-Commit Guard")
     parser.add_argument("--fix", action="store_true", help="Auto-remediate secrets to .env")
+    parser.add_argument("--install", action="store_true", help="Install the Git pre-commit hook")
+    parser.add_argument("--export", action="store_true", help="Write a timestamped JSON audit report")
     parser.add_argument("--endpoint", default=os.getenv("AEGIS_ENDPOINT", "http://localhost:3000"))
     args = parser.parse_args()
 
-    diff = get_staged_diff()
-    if not diff.strip():
-        sys.exit(0)
+    # --install is standalone; it does not require a staged diff.
+    if args.install:
+        install_hook()
+        return
 
+    diff = get_staged_diff()
     staged_items = parse_staged_lines(diff)
     local_findings = run_local_audit(staged_items)
 
@@ -239,6 +443,14 @@ def main():
             }
             for f in server_findings["findings"]
         ]
+
+    # --export writes telemetry regardless of whether secrets were found.
+    if args.export:
+        export_report(diff, total_findings)
+        return
+
+    if not diff.strip():
+        sys.exit(0)
 
     if not total_findings:
         sys.exit(0)

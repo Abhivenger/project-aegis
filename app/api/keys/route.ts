@@ -11,11 +11,25 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /**
+ * Resolves the Clerk session user id defensively. When Clerk is not configured
+ * (or its middleware is bypassed in local mode) `auth()` can throw; we treat
+ * any failure as an unauthenticated request instead of a 500 error.
+ */
+async function getClerkUserId(): Promise<string | null> {
+  try {
+    const session = await auth();
+    return session?.userId ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * List active API keys for the authenticated session.
  */
 export async function GET() {
-  const session = await auth();
-  if (!session || !session.userId) {
+  const userId = await getClerkUserId();
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -29,7 +43,7 @@ export async function GET() {
   const { data: keys, error } = await supabase
     .from('api_keys')
     .select('id, key_name, key_prefix, last_used_at, created_at')
-    .eq('user_id', session.userId)
+    .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -43,8 +57,8 @@ export async function GET() {
  * Generate a new developer API key with one-time plaintext reveal.
  */
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session || !session.userId) {
+  const userId = await getClerkUserId();
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -69,7 +83,7 @@ export async function POST(req: Request) {
   const { data: inserted, error } = await supabase
     .from('api_keys')
     .insert({
-      user_id: session.userId,
+      user_id: userId,
       key_name: keyName,
       key_prefix: keyPrefix,
       hashed_key: hashedKey,
@@ -97,8 +111,8 @@ export async function POST(req: Request) {
  * Revoke an existing API key.
  */
 export async function DELETE(req: Request) {
-  const session = await auth();
-  if (!session || !session.userId) {
+  const userId = await getClerkUserId();
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -120,7 +134,7 @@ export async function DELETE(req: Request) {
     .from('api_keys')
     .delete()
     .eq('id', keyId)
-    .eq('user_id', session.userId);
+    .eq('user_id', userId);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });

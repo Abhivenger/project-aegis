@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { resolveAuthContext } from '@/lib/auth/dual-auth';
+import { resolveAuthContextOrFallback } from '@/lib/auth/dual-auth';
 import { checkAndIncrementQuota } from '@/lib/quota';
 import { scanCodeForPatterns, redactSecret } from '@/lib/scanners/regex-patterns';
 import { extractHighEntropyTokens } from '@/lib/scanners/entropy';
@@ -27,13 +27,7 @@ interface SecretFinding {
 
 export async function POST(req: Request) {
   try {
-    const authContext = await resolveAuthContext(req);
-    if (!authContext) {
-      return NextResponse.json(
-        { error: 'Unauthorized: Missing or invalid API key / session.' },
-        { status: 401 }
-      );
-    }
+    const authContext = await resolveAuthContextOrFallback(req);
 
     const quota = await checkAndIncrementQuota(authContext.userId);
     if (!quota.allowed) {

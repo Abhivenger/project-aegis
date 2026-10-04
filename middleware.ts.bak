@@ -1,0 +1,38 @@
+import { clerkMiddleware } from '@clerk/nextjs/server';
+import { NextResponse, type NextFetchEvent, type NextRequest } from 'next/server';
+import { isClerkConfigured } from '@/lib/auth/clerk-config';
+
+/**
+ * Project Aegis runs fully public in local/demo mode.
+ *
+ * - When no valid Clerk publishable key is configured, Clerk is bypassed
+ *   entirely: no session handshake is attempted and no redirect to
+ *   clerk.example.com can occur.
+ * - When a real key is present, clerkMiddleware runs but NO route is
+ *   force-protected (no `auth.protect()`), so /dashboard, /dashboard/* and
+ *   /api/* remain publicly accessible without an auth redirect.
+ *
+ * API routes resolve identity themselves via resolveAuthContext (Clerk session
+ * or Bearer API key), so the aegis.py CLI keeps working with Bearer tokens.
+ */
+const clerkHandler = isClerkConfigured()
+  ? clerkMiddleware(async () => {
+      // Intentionally public: no auth.protect() calls.
+    })
+  : null;
+
+export default function middleware(request: NextRequest, event: NextFetchEvent) {
+  if (!clerkHandler) {
+    return NextResponse.next();
+  }
+  return clerkHandler(request, event);
+}
+
+export const config = {
+  matcher: [
+    // Skip Next.js internals and static assets
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    // Always run for API routes
+    '/(api|trpc)(.*)',
+  ],
+};

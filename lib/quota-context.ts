@@ -1,9 +1,10 @@
 "use client";
 
 import { createContext, useContext } from 'react';
+import { FREE_TIER_SCAN_LIMIT } from '@/lib/quota-store';
 
 /** Hard scan cap for the Free tier. Enterprise bypasses this entirely. */
-export const FREE_TIER_SCAN_LIMIT = 50;
+export { FREE_TIER_SCAN_LIMIT };
 
 export interface DashboardQuotaState {
   /** 'Free' is subject to the 50-scan cap; 'Enterprise' is unlimited. */

@@ -3,10 +3,23 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { UserButton } from '@clerk/nextjs';
 import { SpotlightCard } from '@/components/ui/spotlight-card';
+import { UserMenu } from '@/components/user-menu';
 import { MockCheckoutModal } from '@/components/mock-checkout-modal';
-import { QuotaContext, FREE_TIER_SCAN_LIMIT, type DashboardQuotaState } from '@/lib/quota-context';
+import { CommandPalette } from '@/components/command-palette';
+import { QuotaContext, type DashboardQuotaState } from '@/lib/quota-context';
+import {
+  QUOTA_STORAGE_KEY,
+  DEFAULT_QUOTA_SNAPSHOT,
+  hydrateQuotaSnapshot,
+  serializeQuotaSnapshot,
+  incrementQuotaSnapshot,
+  upgradeQuotaSnapshot,
+  reconcileQuotaSnapshots,
+  isQuotaExhausted,
+  quotaUsagePercent,
+  type QuotaSnapshot,
+} from '@/lib/quota-store';
 import {
   Shield,
   Globe,
@@ -14,20 +27,16 @@ import {
   Key,
   Menu,
   X,
-  ExternalLink,
   Flame,
   Activity,
   Radar,
   GitCommitHorizontal,
   Zap,
   Sparkles,
+  Terminal,
+  Command,
+  CircleDot,
 } from 'lucide-react';
-
-interface QuotaState {
-  remaining: number;
-  dailyScanCount: number;
-  maxDailyQuota: number;
-}
 
 export default function DashboardLayout({
   children,
@@ -37,53 +46,72 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [tierName, setTierName] = useState('Free Tier');
-  const [quota, setQuota] = useState<QuotaState>({
-    remaining: 48,
-    dailyScanCount: 2,
-    maxDailyQuota: 50,
-  });
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [quota, setQuota] = useState<QuotaSnapshot>(DEFAULT_QUOTA_SNAPSHOT);
+  const [hydrated, setHydrated] = useState(false);
 
-  const isUnlimited = tierName === 'Enterprise Tier';
+  const isUnlimited = quota.tier === 'Enterprise';
+  const tierName = isUnlimited ? 'Enterprise Tier' : 'Free Tier';
+
+  // Hydrate persisted quota telemetry on mount (kept out of the initial render
+  // so server and first client paint stay identical — no hydration mismatch).
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(QUOTA_STORAGE_KEY);
+      setQuota(hydrateQuotaSnapshot(stored));
+    } catch {
+      // localStorage unavailable (private mode); keep the safe default snapshot.
+    }
+    setHydrated(true);
+  }, []);
+
+  // Persist every transition once hydrated. Writes are derived, never mutated.
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    try {
+      window.localStorage.setItem(QUOTA_STORAGE_KEY, serializeQuotaSnapshot(quota));
+    } catch {
+      // Persistence is best-effort; in-memory state remains authoritative.
+    }
+  }, [quota, hydrated]);
+
+  // Cross-tab reconciliation: prevent last-write-wins from dropping scans.
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== QUOTA_STORAGE_KEY) {
+        return;
+      }
+      setQuota((prev) => reconcileQuotaSnapshots(prev, hydrateQuotaSnapshot(event.newValue)));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   // Live scan counter: any page that completes a scan dispatches 'aegis:scan'.
-  // Free tier is hard-clamped at 50; Enterprise scans are uncapped.
+  // Functional updates keep concurrent events race-free; the reducer clamps.
   useEffect(() => {
-    const onScan = () => {
-      setQuota((prev) => {
-        const newCount = prev.dailyScanCount + 1;
-        const cappedCount = isUnlimited ? newCount : Math.min(newCount, FREE_TIER_SCAN_LIMIT);
-        return {
-          ...prev,
-          dailyScanCount: cappedCount,
-          remaining: Math.max(0, prev.remaining - (cappedCount - prev.dailyScanCount)),
-        };
-      });
-    };
+    const onScan = () => setQuota((prev) => incrementQuotaSnapshot(prev));
     window.addEventListener('aegis:scan', onScan);
     return () => window.removeEventListener('aegis:scan', onScan);
-  }, [isUnlimited]);
+  }, []);
 
   // Pages dispatch 'aegis:scan-blocked' when the Free-tier limit is hit,
   // which pops the mock checkout modal for an immediate upgrade path.
   useEffect(() => {
     const onScanBlocked = () => {
-      if (!isUnlimited && quota.dailyScanCount >= FREE_TIER_SCAN_LIMIT) {
+      if (isQuotaExhausted(quota)) {
         setCheckoutOpen(true);
       }
     };
     window.addEventListener('aegis:scan-blocked', onScanBlocked);
     return () => window.removeEventListener('aegis:scan-blocked', onScanBlocked);
-  }, [isUnlimited, quota.dailyScanCount]);
+  }, [quota]);
 
   // Upgrade flow: Enterprise = unlimited quota display.
   const handleUpgradeSuccess = () => {
-    setTierName('Enterprise Tier');
-    setQuota((prev) => ({
-      ...prev,
-      remaining: Number.MAX_SAFE_INTEGER,
-      maxDailyQuota: Number.MAX_SAFE_INTEGER,
-    }));
+    setQuota((prev) => upgradeQuotaSnapshot(prev));
   };
 
   const navItems = [
@@ -107,17 +135,15 @@ export default function DashboardLayout({
     },
   ];
 
-  const quotaPercent = isUnlimited
-    ? 100
-    : Math.min(100, Math.round((quota.dailyScanCount / quota.maxDailyQuota) * 100));
+  const quotaPercent = quotaUsagePercent(quota);
 
   // Quota snapshot shared with dashboard pages via context.
   const quotaContextValue: DashboardQuotaState = {
-    tier: isUnlimited ? 'Enterprise' : 'Free',
+    tier: quota.tier,
     dailyScanCount: quota.dailyScanCount,
     maxDailyQuota: quota.maxDailyQuota,
     remaining: quota.remaining,
-    quotaExhausted: !isUnlimited && quota.dailyScanCount >= FREE_TIER_SCAN_LIMIT,
+    quotaExhausted: isQuotaExhausted(quota),
   };
 
   // Cyber Bento Grid: headline defense metrics in spotlight cards.
@@ -162,7 +188,7 @@ export default function DashboardLayout({
           <span className="font-bold text-white tracking-wide text-sm">AEGIS</span>
         </Link>
         <div className="flex items-center gap-3">
-          <UserButton afterSignOutUrl="/" />
+          <UserMenu compact />
           <button
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
             className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
@@ -221,6 +247,20 @@ export default function DashboardLayout({
                 </Link>
               );
             })}
+
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="w-full mt-1 flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 text-slate-400 text-xs font-semibold transition"
+            >
+              <span className="flex items-center gap-2.5">
+                <Terminal className="w-4 h-4 text-cyan-400" />
+                Command Palette
+              </span>
+              <span className="flex items-center gap-0.5 font-mono text-[10px] text-slate-500 border border-slate-700 rounded px-1 py-0.5">
+                <Command className="w-2.5 h-2.5" />K
+              </span>
+            </button>
           </nav>
         </div>
 
@@ -263,19 +303,13 @@ export default function DashboardLayout({
 
           {/* Desktop User Section */}
           <div className="hidden md:flex items-center justify-between pt-1">
-            <div className="flex items-center gap-2.5">
-              <UserButton afterSignOutUrl="/" />
-              <div className="text-xs">
-                <span className="text-slate-300 font-semibold block leading-tight">My Workspace</span>
-                <span className="text-[10px] text-emerald-400 font-mono">● Live Protection</span>
-              </div>
-            </div>
+            <UserMenu />
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 min-h-screen overflow-x-hidden p-4 sm:p-6 md:p-8">
+      <main className="flex-1 min-h-screen overflow-x-hidden p-4 pb-20 sm:p-6 sm:pb-20 md:p-8 md:pb-20">
         <div className="max-w-6xl mx-auto space-y-6">
           <QuotaContext.Provider value={quotaContextValue}>
           {/* Cyber Bento Grid */}
@@ -315,12 +349,60 @@ export default function DashboardLayout({
         </div>
       </main>
 
+      {/* Global HUD Status Bar */}
+      <footer className="fixed bottom-0 left-0 right-0 md:left-64 z-30 border-t border-slate-800/80 bg-[#050a16]/95 backdrop-blur">
+        <div className="flex items-center justify-between gap-3 px-4 py-2 text-[10px] font-mono">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <span className="flex items-center gap-1.5 text-emerald-400 whitespace-nowrap">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-hud-pulse" />
+              SAFELINK: ARMED
+            </span>
+            <span className="flex items-center gap-1.5 text-cyan-400 whitespace-nowrap">
+              <GitCommitHorizontal className="w-3 h-3" />
+              GITSHIELD: ACTIVE
+            </span>
+            <span className="hidden lg:flex items-center gap-1.5 text-slate-500 whitespace-nowrap">
+              <CircleDot className="w-3 h-3 text-slate-600" />
+              LOCAL REPO MONITOR: LIVE
+            </span>
+          </div>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="text-slate-400 whitespace-nowrap">
+              QUOTA{' '}
+              <span className="text-slate-200">
+                {isUnlimited ? '∞' : `${quota.dailyScanCount}/${quota.maxDailyQuota}`}
+              </span>
+            </span>
+            <span
+              className={`px-1.5 py-0.5 rounded border whitespace-nowrap ${
+                isUnlimited
+                  ? 'text-amber-300 border-amber-500/40 bg-amber-500/10'
+                  : 'text-cyan-300 border-cyan-500/40 bg-cyan-500/10'
+              }`}
+            >
+              {quota.tier.toUpperCase()}
+            </span>
+            <button
+              type="button"
+              onClick={() => setPaletteOpen(true)}
+              className="hidden sm:flex items-center gap-1 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700 rounded px-1.5 py-0.5 transition"
+              aria-label="Open command palette"
+            >
+              <Command className="w-3 h-3" />K
+            </button>
+          </div>
+        </div>
+      </footer>
+
       {/* Mock Enterprise Checkout */}
       <MockCheckoutModal
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
         onSuccess={handleUpgradeSuccess}
       />
+
+      {/* Cyber Command Palette */}
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );
 }

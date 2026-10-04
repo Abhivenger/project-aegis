@@ -13,9 +13,18 @@ export interface AuthContext {
   keyPrefix?: string;
 }
 
+/** Shared audience for scans/run without real auth. */
+export const FAILED_OPEN_OPERATOR: AuthContext = {
+  userId: 'local-operator-001',
+  authMethod: 'clerk_session',
+};
+
+export const fallbackOperatorId = FAILED_OPEN_OPERATOR.userId;
+
 /**
- * Resolves user identity from either an incoming Bearer API Key or an active Clerk session.
- * Returns null if both authentication methods fail or are missing.
+ * Resolves user identity from either an incoming Bearer API Key or an active
+ * Clerk session. Returns `null` if both authentication methods fail or are
+ * missing.
  */
 export async function resolveAuthContext(req: Request): Promise<AuthContext | null> {
   const authHeader = req.headers.get('authorization') || req.headers.get('Authorization');
@@ -31,27 +40,27 @@ export async function resolveAuthContext(req: Request): Promise<AuthContext | nu
       // Fall through to Clerk session strategy, which may still succeed.
       console.warn('[auth] Supabase not configured - cannot validate API keys.');
     } else {
-    const { data: apiKeyRecord, error } = await supabase
-      .from('api_keys')
-      .select('id, user_id, key_prefix')
-      .eq('hashed_key', hashedKey)
-      .single();
+      const { data: apiKeyRecord, error } = await supabase
+        .from('api_keys')
+        .select('id, user_id, key_prefix')
+        .eq('hashed_key', hashedKey)
+        .single();
 
-    if (error || !apiKeyRecord) {
-      return null;
-    }
+      if (error || !apiKeyRecord) {
+        return null;
+      }
 
-    // Touch last_used_at timestamp asynchronously
-    void supabase
-      .from('api_keys')
-      .update({ last_used_at: new Date().toISOString() })
-      .eq('id', apiKeyRecord.id);
+      // Touch last_used_at timestamp asynchronously
+      void supabase
+        .from('api_keys')
+        .update({ last_used_at: new Date().toISOString() })
+        .eq('id', apiKeyRecord.id);
 
-    return {
-      userId: apiKeyRecord.user_id,
-      authMethod: 'api_key',
-      keyPrefix: apiKeyRecord.key_prefix,
-    };
+      return {
+        userId: apiKeyRecord.user_id,
+        authMethod: 'api_key',
+        keyPrefix: apiKeyRecord.key_prefix,
+      };
     }
   }
 
@@ -69,4 +78,28 @@ export async function resolveAuthContext(req: Request): Promise<AuthContext | nu
   }
 
   return null;
+}
+
+/**
+ * Resolves a request identity, falling back to a local-operator context when
+ * real authentication is unavailable, fails, or throws. This is the resolver
+ * used by scan route handlers so that public / postman / dashboard usage never
+ * receives a 401 — it scans under the `local-operator-001` audience instead.
+ *
+ * IMPORTantly: quota/DB errors must never take down scans, so the returned
+ * context is always valid.
+ */
+export async function resolveAuthContextOrFallback(
+  req: Request
+): Promise<AuthContext> {
+  try {
+    const context = await resolveAuthContext(req);
+    if (context) {
+      return context;
+    }
+  } catch (authError) {
+    console.warn('[auth-resolver] auth resolution failed, using fallback operator:', authError);
+  }
+
+  return FAILED_OPEN_OPERATOR;
 }

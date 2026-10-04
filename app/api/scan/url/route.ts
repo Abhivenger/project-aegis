@@ -3,7 +3,7 @@
 // ============================================================================
 
 import { NextResponse } from 'next/server';
-import { resolveAuthContext, type AuthContext } from '@/lib/auth/dual-auth';
+import { resolveAuthContextOrFallback, type AuthContext } from '@/lib/auth/dual-auth';
 import { checkAndIncrementQuota, type QuotaStatus } from '@/lib/quota';
 import { analyzeUrl } from '@/lib/scanners/url-analyzer';
 import { getServiceSupabase } from '@/lib/supabase/server';
@@ -24,22 +24,10 @@ function normalizeUrlInput(raw: string): string {
 }
 
 /** Shared identity used when real authentication is unavailable or fails. */
-const DEMO_USER_ID = 'demo_user';
-
-/**
- * Resolves the request identity, falling back to a shared demo user so that
- * missing Clerk config or failed auth checks never hard-block scans.
- */
 async function resolveUserId(req: Request): Promise<AuthContext> {
-  try {
-    const authContext = await resolveAuthContext(req);
-    if (authContext) {
-      return authContext;
-    }
-  } catch (authError) {
-    console.error('[scan/url] Auth resolution failed, using demo user:', authError);
-  }
-  return { userId: DEMO_USER_ID, authMethod: 'clerk_session' };
+  // Reuse the shared fallback resolver so /api/scan/url and /api/scan/secret
+  // behave identically when no real auth is present.
+  return resolveAuthContextOrFallback(req);
 }
 
 export async function POST(req: Request) {

@@ -237,7 +237,7 @@ export default function CodeAuditorPage() {
         </div>
 
         {/* Textarea Code Input */}
-        <div className="relative">
+        <div className="relative" data-tour="code-editor">
           <textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -284,6 +284,7 @@ export default function CodeAuditorPage() {
             </div>
             <button
               onClick={() => setReportOpen(true)}
+              data-tour="export-audit"
               className="flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 text-xs font-bold transition"
             >
               <FileText className="w-3.5 h-3.5" />

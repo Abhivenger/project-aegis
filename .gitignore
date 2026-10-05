@@ -9,3 +9,8 @@ dist/
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+tsconfig.tsbuildinfo
+.data/
+*.pyc
+__pycache__/

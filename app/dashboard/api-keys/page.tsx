@@ -125,7 +125,10 @@ export default function ApiKeysPage() {
       </div>
 
       {/* Keys Table */}
-      <div className="bg-[#060b18] border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+      <div
+        data-tour="api-keys-table"
+        className="bg-[#060b18] border border-slate-800 rounded-2xl overflow-hidden shadow-xl"
+      >
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-slate-900/80 border-b border-slate-800 text-[10px] uppercase font-bold text-slate-400 tracking-wider">

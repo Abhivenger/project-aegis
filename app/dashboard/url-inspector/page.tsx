@@ -140,7 +140,10 @@ export default function UrlInspectorPage() {
       </div>
 
       {/* Search Input Bar */}
-      <div className="bg-[#060b18] border border-slate-800 p-2 sm:p-2.5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center gap-2">
+      <div
+        data-tour="url-input"
+        className="bg-[#060b18] border border-slate-800 p-2 sm:p-2.5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-center gap-2"
+      >
         <div className="relative flex-1 w-full overflow-hidden rounded-xl">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input

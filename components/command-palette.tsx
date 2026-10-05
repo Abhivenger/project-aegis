@@ -14,6 +14,7 @@ import {
   Trash2,
   CornerDownLeft,
   Command,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -21,6 +22,7 @@ import {
   dispatchPreset,
   type PresetId,
 } from "@/lib/preset-bus";
+import { startDemoTour } from "@/lib/tour-bus";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -61,6 +63,18 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   const commands = useMemo<PaletteCommand[]>(
     () => [
+      {
+        id: "start-tour",
+        label: "Start Guided Demo Tour",
+        hint: "5-step cinematic walkthrough for recordings",
+        group: "Navigation",
+        icon: Clapperboard,
+        keywords: ["tour", "demo", "walkthrough", "guide", "record", "video", "presentation"],
+        run: () => {
+          startDemoTour();
+          close();
+        },
+      },
       {
         id: "nav-url",
         label: "SafeLink URL Inspector",

@@ -463,7 +463,10 @@ export function CodeDiffViewer({
   };
 
   return (
-    <div className="flex w-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#0a101f] shadow-2xl">
+    <div
+      data-tour="remediation-diff"
+      className="flex w-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#0a101f] shadow-2xl"
+    >
       {/* Top Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-[#060b18] px-4 py-2">
         <div className="flex min-w-0 items-center gap-1 sm:gap-2">
@@ -578,9 +581,13 @@ export function CodeDiffViewer({
           )}
 
           {/* View Mode Toggle */}
-          <div className="relative flex items-center gap-0.5 rounded-lg border border-slate-800 bg-slate-900/80 p-0.5">
+          <div
+            data-tour="entropy-toggle"
+            className="relative flex items-center gap-0.5 rounded-lg border border-slate-800 bg-slate-900/80 p-0.5"
+          >
             <button
               onClick={() => setViewMode('diff')}
+              data-tour-action="diff-view"
               aria-pressed={viewMode === 'diff'}
               className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                 viewMode === 'diff' ? 'text-cyan-300' : 'text-slate-400 hover:text-slate-200'
@@ -599,6 +606,7 @@ export function CodeDiffViewer({
 
             <button
               onClick={() => setViewMode('heatmap')}
+              data-tour-action="entropy-heatmap"
               aria-pressed={viewMode === 'heatmap'}
               className={`relative flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                 viewMode === 'heatmap' ? 'text-rose-300' : 'text-slate-400 hover:text-slate-200'

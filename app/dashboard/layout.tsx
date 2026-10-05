@@ -7,6 +7,8 @@ import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { UserMenu } from '@/components/user-menu';
 import { MockCheckoutModal } from '@/components/mock-checkout-modal';
 import { CommandPalette } from '@/components/command-palette';
+import { DemoTour } from '@/components/demo-tour';
+import { startDemoTour } from '@/lib/tour-bus';
 import { QuotaContext, type DashboardQuotaState } from '@/lib/quota-context';
 import {
   QUOTA_STORAGE_KEY,
@@ -350,7 +352,10 @@ export default function DashboardLayout({
       </main>
 
       {/* Global HUD Status Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 md:left-64 z-30 border-t border-slate-800/80 bg-[#050a16]/95 backdrop-blur">
+      <footer
+        data-tour="hud-status"
+        className="fixed bottom-0 left-0 right-0 md:left-64 z-30 border-t border-slate-800/80 bg-[#050a16]/95 backdrop-blur"
+      >
         <div className="flex items-center justify-between gap-3 px-4 py-2 text-[10px] font-mono">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <span className="flex items-center gap-1.5 text-emerald-400 whitespace-nowrap">
@@ -365,6 +370,15 @@ export default function DashboardLayout({
               <CircleDot className="w-3 h-3 text-slate-600" />
               LOCAL REPO MONITOR: LIVE
             </span>
+            <button
+              type="button"
+              onClick={startDemoTour}
+              aria-label="Start the guided demo tour"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 shadow-[0_0_14px_rgba(34,211,238,0.4)] transition hover:bg-cyan-500/20 hover:shadow-[0_0_22px_rgba(34,211,238,0.6)]"
+            >
+              <span className="text-[11px] leading-none">🎬</span>
+              <span className="tracking-wide">Demo Tour</span>
+            </button>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <span className="text-slate-400 whitespace-nowrap">
@@ -403,6 +417,9 @@ export default function DashboardLayout({
 
       {/* Cyber Command Palette */}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+
+      {/* Cinematic Guided Walkthrough */}
+      <DemoTour />
     </div>
   );
 }

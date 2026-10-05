@@ -285,7 +285,10 @@ export function RedTeamLab() {
   const revealedAll = run !== null && visibleLines >= run.lines.length;
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-[#060b18] shadow-xl overflow-hidden">
+    <section
+      data-tour="red-team-lab"
+      className="rounded-2xl border border-slate-800 bg-[#060b18] shadow-xl overflow-hidden"
+    >
       {/* Header / toggle */}
       <button
         type="button"

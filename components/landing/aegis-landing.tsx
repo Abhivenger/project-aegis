@@ -1,23 +1,19 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from "react";
-import { motion } from "motion/react";
-import { toast } from "sonner";
+import { MotionConfig, motion } from "motion/react";
 import {
-  ArrowRight,
-  BadgeCheck,
-  Check,
   ChevronRight,
   CircleDot,
   Code2,
-  Cloud,
   Github,
-  KeyRound,
-  LockKeyhole,
+  Globe,
   Menu,
-  Radar,
+  PlayCircle,
   Shield,
+  Terminal,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { analyzeCode } from "@/lib/scanners/code-analysis";
 import { STRIPE_PRESET, type SecurityPreset } from "@/lib/demo-presets";
@@ -26,27 +22,15 @@ import { VulnerabilityCard } from "@/components/vulnerability-card";
 import { SafeLinkResult } from "@/components/safelink-result";
 import type { UrlAnalysisReport } from "@/lib/scanners/url-analyzer";
 
-const springInteraction = { type: "spring" as const, stiffness: 400, damping: 30 };
-const springCard = { type: "spring" as const, stiffness: 350, damping: 25 };
-
-function Pill({ children, tone = "cyan" }: { children: React.ReactNode; tone?: "cyan" | "emerald" | "slate" }) {
-  const toneClass = {
-    cyan: "border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-200",
-    emerald: "border-emerald-300/20 bg-emerald-300/[0.07] text-emerald-200",
-    slate: "border-white/[0.10] bg-white/[0.04] text-zinc-300",
-  }[tone];
-
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[10px] font-medium tracking-[0.16em] uppercase ${toneClass}`}>{children}</span>;
-}
+const springCard = { type: "spring" as const, stiffness: 320, damping: 28 };
 
 function Wordmark() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="relative flex h-8 w-8 items-center justify-center rounded-[10px] border border-cyan-200/20 bg-cyan-300/[0.10] text-cyan-200">
-        <Shield className="h-4 w-4" strokeWidth={1.8} />
-        <span className="absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,231,183,0.85)]" />
+      <div className="flex h-8 w-8 items-center justify-center rounded-[10px] border border-cyan-200/20 bg-cyan-300/[0.08] text-cyan-200">
+        <Shield className="h-4 w-4" strokeWidth={1.8} aria-hidden />
       </div>
-      <span className="text-sm font-semibold tracking-[0.20em] text-white">AEGIS</span>
+      <span className="text-sm font-semibold tracking-[0.18em] text-white">AEGIS</span>
     </div>
   );
 }
@@ -94,110 +78,216 @@ function SandboxWidget() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springCard, delay: 0.18 }} className="relative mx-auto w-full max-w-[820px] overflow-hidden rounded-[22px] border border-white/[0.11] bg-[#0f1420]/80 text-left shadow-[0_24px_90px_rgba(0,0,0,0.30)] backdrop-blur-xl">
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ ...springCard, delay: 0.05 }}
+      className="relative mx-auto w-full max-w-[820px] overflow-hidden rounded-2xl border border-white/[0.09] bg-[#0c1017]/85 text-left shadow-[0_24px_80px_rgba(0,0,0,0.35)] backdrop-blur-xl"
+    >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/40 to-transparent" />
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.08] px-5 py-4">
-        <div><h2 className="text-sm font-semibold text-white">Try Aegis. See a threat. Fix it.</h2><p className="mt-1 text-[11px] text-zinc-500">No account. No setup. Pick an example below.</p></div>
-        <div className="flex items-center gap-1.5 text-[10px] text-emerald-300"><CircleDot className="h-3 w-3" /> {urlMode ? "SAFELINK API" : "LOCAL ENGINE"}</div>
+        <div>
+          <h2 className="text-sm font-semibold text-white">Try Aegis. See a threat. Fix it.</h2>
+          <p className="mt-1 text-[11px] text-zinc-400">No account, no setup. Pick an example.</p>
+        </div>
+        <div className="flex items-center gap-1.5 font-mono text-[10px] text-emerald-300">
+          <CircleDot className="h-3 w-3" aria-hidden />
+          {urlMode ? "SAFELINK API" : "LOCAL ENGINE"}
+        </div>
       </div>
       <div className="space-y-4 p-4 sm:p-5">
-        <SecurityPresets onSelect={selectPreset} selected={selected} />
-        <textarea aria-label="Local Aegis code audit input" value={source} maxLength={120000} onChange={(event) => {
-          ++scanVersion.current;
-          setSource(event.target.value);
-          setSelected(null);
-          setUrlReport(null);
-          setLoading(false);
-          setError(null);
-        }} spellCheck={false} placeholder="Paste code or pick an example above..." className="h-[205px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#07090E]/70 p-4 font-mono text-xs leading-6 text-zinc-300 outline-none focus-visible:border-cyan-300/40 focus-visible:ring-1 focus-visible:ring-cyan-300/40" />
-        {urlMode && <button type="button" disabled={loading} onClick={() => void inspectUrl(source.trim(), ++scanVersion.current)} className="flex min-h-10 items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-xs font-semibold text-cyan-100 disabled:opacity-50"><Shield className="h-4 w-4" />{loading ? "Intercepting destination..." : "Inspect with SafeLink"}</button>}
-        {error && <p role="alert" className="rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-xs text-rose-200">{error}</p>}
-        {loading && <p role="status" className="text-xs text-cyan-200">Checking destination against reserved network rules...</p>}
-        {urlMode ? urlReport && <SafeLinkResult report={urlReport} /> : source.trim() ? <VulnerabilityCard key={source} findings={result.findings} remediation={result.remediation} originalContent={source} filename={filename} /> : <p className="text-xs text-zinc-400">Pick an example to get an instant security check.</p>}
+        <div className="[&_button]:min-h-11 [&_button]:cursor-pointer">
+          <SecurityPresets onSelect={selectPreset} selected={selected} />
+        </div>
+        <textarea
+          aria-label="Local Aegis code audit input"
+          value={source}
+          maxLength={120000}
+          onChange={(event) => {
+            ++scanVersion.current;
+            setSource(event.target.value);
+            setSelected(null);
+            setUrlReport(null);
+            setLoading(false);
+            setError(null);
+          }}
+          spellCheck={false}
+          placeholder="Paste code or pick an example above..."
+          className="h-[205px] w-full resize-y rounded-xl border border-white/[0.09] bg-[#07090e]/80 p-4 font-mono text-xs leading-6 text-zinc-300 outline-none focus-visible:border-cyan-300/40 focus-visible:ring-1 focus-visible:ring-cyan-300/40"
+        />
+        {urlMode && (
+          <button
+            type="button"
+            disabled={loading}
+            onClick={() => void inspectUrl(source.trim(), ++scanVersion.current)}
+            className="flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-cyan-300/25 bg-cyan-300/10 px-4 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/[0.16] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Shield className="h-4 w-4" aria-hidden />
+            {loading ? "Checking destination..." : "Inspect with SafeLink"}
+          </button>
+        )}
+        {error && (
+          <p role="alert" className="rounded-xl border border-rose-300/20 bg-rose-300/5 p-3 text-xs text-rose-200">
+            {error}
+          </p>
+        )}
+        {loading && (
+          <p role="status" className="text-xs text-cyan-200">
+            Checking destination against reserved network ranges...
+          </p>
+        )}
+        {urlMode ? (
+          urlReport && <SafeLinkResult report={urlReport} />
+        ) : source.trim() ? (
+          <VulnerabilityCard
+            key={source}
+            findings={result.findings}
+            remediation={result.remediation}
+            originalContent={source}
+            filename={filename}
+          />
+        ) : (
+          <p className="text-xs text-zinc-400">Pick an example to run a security check.</p>
+        )}
       </div>
     </motion.div>
   );
 }
 
-function GitHubShowcase() {
-  return (
-    <div className="relative overflow-hidden rounded-[24px] border border-white/[0.10] bg-[#0f1420]/70 p-5 backdrop-blur-xl sm:p-7">
-      <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-cyan-300/[0.08] blur-3xl" />
-      <div className="relative mb-8">
-        <Pill tone="slate"><Github className="mr-1.5 h-3 w-3" /> GitHub Shield</Pill>
-        <h3 className="mt-4 max-w-md text-xl font-semibold tracking-[-0.03em] text-white">Point Aegis at a repository. See every leak before it ships.</h3>
-      </div>
-      <div className="relative grid items-center gap-3 sm:grid-cols-[1fr_48px_1fr_48px_1fr]">
-        <FlowNode icon={<Github className="h-4 w-4" />} label="Repository" value="owner / repo" />
-        <FlowArrow />
-        <FlowNode icon={<Radar className="h-4 w-4" />} label="Entropy + signatures" value="20 high-risk files" />
-        <FlowArrow />
-        <FlowNode icon={<Shield className="h-4 w-4" />} label="Aegis decision" value="score + .env fix" />
-      </div>
-      <div className="relative mt-6 flex flex-col justify-between gap-3 border-t border-white/[0.08] pt-4 text-[11px] sm:flex-row sm:items-center">
-        <span className="text-zinc-400">Runs live against the GitHub API from your dashboard.</span>
-        <motion.a href="/dashboard" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={springInteraction} className="flex items-center justify-center gap-2 rounded-xl border border-cyan-200/20 bg-cyan-300/[0.09] px-3.5 py-2 font-medium text-cyan-100 transition hover:bg-cyan-300/[0.14]">Scan a real repository <ArrowRight className="h-3.5 w-3.5" /></motion.a>
-      </div>
-    </div>
-  );
-}
-
 function FlowNode({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.05] p-3.5">
-      <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-lg border border-cyan-300/20 text-cyan-200">{icon}</div>
-      <div className="text-[10px] uppercase tracking-[0.14em] text-zinc-500">{label}</div>
+    <div className="rounded-xl border border-white/[0.09] bg-[#0c1017] p-3.5">
+      <div className="mb-4 flex h-7 w-7 items-center justify-center rounded-lg border border-white/[0.10] text-zinc-300">{icon}</div>
+      <div className="font-mono text-[10px] text-zinc-400">{label}</div>
       <div className="mt-1 truncate font-mono text-[11px] text-zinc-200">{value}</div>
     </div>
   );
 }
 
 function FlowArrow() {
-  return <div className="hidden justify-center text-zinc-500 sm:flex"><ChevronRight className="h-4 w-4" /></div>;
+  return (
+    <div className="hidden justify-center text-zinc-600 sm:flex">
+      <ChevronRight className="h-4 w-4" aria-hidden />
+    </div>
+  );
 }
+
+function GitHubShowcase() {
+  return (
+    <div className="mt-8 rounded-2xl border border-white/[0.09] bg-[#0c1017] p-5 sm:p-7">
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <p className="font-mono text-[11px] text-zinc-400">GitHub REST API</p>
+          <h3 className="mt-2 max-w-md text-lg font-semibold tracking-[-0.02em] text-white">
+            Point Aegis at a repository. Read the scanner's own findings.
+          </h3>
+        </div>
+        <a
+          href="/dashboard"
+          className="inline-flex min-h-11 items-center rounded-xl border border-white/[0.10] bg-white/[0.03] px-4 text-xs font-semibold text-zinc-200 transition-colors hover:border-cyan-300/30 hover:text-cyan-100"
+        >
+          Open the repo scanner
+        </a>
+      </div>
+      <div className="grid items-center gap-3 sm:grid-cols-[1fr_48px_1fr_48px_1fr]">
+        <FlowNode icon={<Github className="h-4 w-4" aria-hidden />} label="Repository" value="owner / repo" />
+        <FlowArrow />
+        <FlowNode icon={<Shield className="h-4 w-4" aria-hidden />} label="Scan" value="20 files, 100 KB cap" />
+        <FlowArrow />
+        <FlowNode icon={<Code2 className="h-4 w-4" aria-hidden />} label="Decision" value="score + .env diff" />
+      </div>
+      <p className="mt-6 border-t border-white/[0.08] pt-4 font-mono text-[10px] text-zinc-400">
+        Streams per-file progress as NDJSON.
+      </p>
+    </div>
+  );
+}
+
+interface Surface {
+  id: string;
+  icon: LucideIcon;
+  name: string;
+  trigger: string;
+  detail: string;
+  code: string;
+  href: string;
+  cta: string;
+}
+
+const SURFACES: readonly Surface[] = [
+  {
+    id: "cli",
+    icon: Terminal,
+    name: "cli/aegis.py",
+    trigger: "pre-commit",
+    detail:
+      "Reads git diff --cached, runs 27 signatures and H >= 4.55, then exits 1 before the commit leaves the machine.",
+    code: "python3 cli/aegis.py --install",
+    href: "/dashboard/code-auditor",
+    cta: "Open the sandbox",
+  },
+  {
+    id: "repo",
+    icon: Github,
+    name: "POST /api/scan/github",
+    trigger: "repository",
+    detail:
+      "Streams GitHub REST API results for the 20 highest-risk files, capped at 100 KB each, as NDJSON progress events.",
+    code: "Accept: application/x-ndjson",
+    href: "/dashboard",
+    cta: "Open the repo scanner",
+  },
+  {
+    id: "safelink",
+    icon: Globe,
+    name: "POST /api/scan/url",
+    trigger: "any URL",
+    detail:
+      "Validates every redirect hop against private, loopback, and metadata ranges. Stops at 5 hops or 3.5s per probe.",
+    code: "max 5 hops / 3.5s per probe",
+    href: "/dashboard/url-inspector",
+    cta: "Open SafeLink",
+  },
+];
 
 interface PricingTier {
   name: string;
   price: string;
   suffix?: string;
-  description: string;
+  audience: string;
   features: string[];
   cta: string;
-  featured?: boolean;
+  href: string;
 }
 
-const PRICING: PricingTier[] = [
-  { name: "Community", price: "$0", suffix: "/ forever", description: "The local defense layer for every developer.", features: ["Open-source CLI", "Shannon entropy engine", "Local pre-commit hooks", "Community support"], cta: "Start locally" },
-  { name: "Pro / Team", price: "$19", suffix: "/ seat / mo", description: "Cloud protection that keeps your team moving.", features: ["1-click GitHub PR Shield", "Cloud secret auditor", "Encrypted Web Vault", "Automated AI patch generator"], cta: "Start protecting", featured: true },
-  { name: "Enterprise", price: "Custom", description: "Aegis shaped around your security program.", features: ["Dedicated LLM gateways", "SOC2 compliance reporting", "Custom regex engines", "Priority security engineering"], cta: "Talk to Aegis" },
+const PRICING: readonly PricingTier[] = [
+  {
+    name: "Community",
+    price: "$0",
+    suffix: "/ forever",
+    audience: "One developer, offline.",
+    features: ["Zero-dependency Python CLI", "27 signatures + H >= 4.55", "Pre-commit hook and .env extraction", "No network calls"],
+    cta: "Open the code sandbox",
+    href: "/dashboard/code-auditor",
+  },
+  {
+    name: "Team",
+    price: "$19",
+    suffix: "/ seat / mo",
+    audience: "Teams scanning repositories.",
+    features: ["Live GitHub repository scanner", "SafeLink URL inspector", "Encrypted Web Vault", "Streaming scan progress"],
+    cta: "Open the dashboard",
+    href: "/dashboard",
+  },
+  {
+    name: "Enterprise",
+    price: "Custom",
+    audience: "Controlled deployments.",
+    features: ["Unlimited scan quota", "Bring your own model endpoint", "Redacted JSON audit exports", "NDJSON scan API"],
+    cta: "Open the API keys page",
+    href: "/dashboard/api-keys",
+  },
 ];
-
-function PricingSection() {
-  return (
-    <section id="pricing" className="mx-auto max-w-6xl scroll-mt-24 px-5 py-28 sm:px-8">
-      <div className="mx-auto max-w-2xl text-center">
-        <Pill tone="emerald">Simple by design</Pill>
-        <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">Protection that scales with your ambition.</h2>
-        <p className="mt-5 text-sm leading-7 text-zinc-400 sm:text-base">Start with the local engine. Add the cloud when your team is ready to ship without secrets in the diff.</p>
-      </div>
-      <div className="mt-12 grid gap-4 lg:grid-cols-3">
-        {PRICING.map((tier, index) => (
-          <motion.div key={tier.name} initial={{ opacity: 0, y: 14 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }} transition={{ ...springCard, delay: index * 0.08 }} className={`relative overflow-hidden rounded-[24px] border p-6 ${tier.featured ? "border-cyan-300/30 bg-[#101b29]" : "border-white/[0.09] bg-[#0f1420]/70"}`}>
-            {tier.featured && <motion.div aria-hidden animate={{ rotate: 360 }} transition={{ duration: 8, repeat: Infinity, ease: "linear" }} className="absolute -right-24 -top-24 h-48 w-48 rounded-full bg-[conic-gradient(from_90deg,transparent,rgba(103,232,249,0.8),transparent_35%)] opacity-60 blur-2xl" />}
-            <div className="relative">
-              <div className="flex items-center justify-between"><h3 className="text-sm font-semibold text-white">{tier.name}</h3>{tier.featured && <Pill>Most popular</Pill>}</div>
-              <div className="mt-7 flex items-baseline gap-1"><span className="text-4xl font-semibold tracking-[-0.07em] tabular-nums text-white">{tier.price}</span>{tier.suffix && <span className="font-mono text-[10px] text-zinc-500">{tier.suffix}</span>}</div>
-              <p className="mt-3 min-h-10 text-xs leading-5 text-zinc-400">{tier.description}</p>
-              <div className="my-6 h-px bg-white/[0.08]" />
-              <ul className="space-y-3 text-xs text-zinc-300">{tier.features.map((feature) => <li key={feature} className="flex items-start gap-2"><Check className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${tier.featured ? "text-cyan-300" : "text-emerald-300"}`} />{feature}</li>)}</ul>
-              <motion.button type="button" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={springInteraction} onClick={() => toast.success(`${tier.name} selected`, { description: "Your Aegis workspace is ready when you are." })} className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl border px-4 py-2.5 text-xs font-semibold transition ${tier.featured ? "border-cyan-200/30 bg-cyan-300/[0.12] text-cyan-100 hover:bg-cyan-300/[0.18]" : "border-white/[0.11] bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]"}`}>{tier.cta}<ArrowRight className="h-3.5 w-3.5" /></motion.button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 export default function AegisLanding() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -208,40 +298,231 @@ export default function AegisLanding() {
   };
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#07090e] text-zinc-100 selection:bg-cyan-300/20 selection:text-cyan-100">
-      <div className="pointer-events-none fixed inset-0 -z-0 bg-[radial-gradient(circle_at_50%_-10%,rgba(0,240,255,0.12),transparent_33%),radial-gradient(circle_at_90%_30%,rgba(16,185,129,0.07),transparent_25%)]" />
-      <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:px-10">
-        <Wordmark />
-        <div className="hidden items-center gap-7 text-xs text-zinc-400 md:flex"><button onClick={() => scrollTo("product")} className="transition hover:text-white">Product</button><button onClick={() => scrollTo("workflow")} className="transition hover:text-white">How it works</button><button onClick={() => scrollTo("pricing")} className="transition hover:text-white">Pricing</button></div>
-        <div className="hidden items-center gap-2.5 md:flex"><a href="/dashboard" className="rounded-xl px-3.5 py-2 text-xs text-zinc-300 transition hover:text-white">Sign in</a><motion.a href="/dashboard" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={springInteraction} className="rounded-xl border border-cyan-200/20 bg-cyan-300/[0.10] px-4 py-2 text-xs font-semibold text-cyan-100 transition hover:bg-cyan-300/[0.16]">Launch Dashboard</motion.a></div>
-        <button type="button" onClick={() => setMobileOpen((value) => !value)} className="rounded-lg border border-white/[0.10] p-2 text-zinc-300 md:hidden" aria-label="Toggle navigation">{mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
-      </nav>
-      {mobileOpen && <div className="relative z-20 mx-5 flex flex-col gap-2 rounded-2xl border border-white/[0.10] bg-[#0f1420]/95 p-3 backdrop-blur-xl md:hidden"><button onClick={() => scrollTo("product")} className="rounded-xl p-3 text-left text-sm text-zinc-300">Product</button><button onClick={() => scrollTo("workflow")} className="rounded-xl p-3 text-left text-sm text-zinc-300">How it works</button><button onClick={() => scrollTo("pricing")} className="rounded-xl p-3 text-left text-sm text-zinc-300">Pricing</button></div>}
+    <MotionConfig reducedMotion="user">
+      <main className="min-h-screen overflow-hidden bg-[#07090e] text-zinc-100 selection:bg-cyan-300/20 selection:text-cyan-100">
+        <nav className="relative z-20 mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+          <Wordmark />
+          <div className="hidden items-center gap-6 text-xs text-zinc-400 md:flex">
+            {[
+              { id: "product", label: "Product" },
+              { id: "surfaces", label: "Surfaces" },
+              { id: "pricing", label: "Pricing" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollTo(item.id)}
+                className="cursor-pointer py-2 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-cyan-300"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+          <div className="hidden items-center gap-2 md:flex">
+            <a
+              href="/dashboard"
+              className="inline-flex min-h-10 items-center rounded-xl px-3 text-xs text-zinc-300 transition-colors hover:text-white"
+            >
+              Open dashboard
+            </a>
+            <a
+              href="/dashboard?tour=1"
+              className="inline-flex min-h-10 items-center rounded-xl border border-cyan-200/25 bg-cyan-300/[0.10] px-4 text-xs font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/[0.16]"
+            >
+              Run the tour
+            </a>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileOpen((value) => !value)}
+            className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg border border-white/[0.10] text-zinc-300 md:hidden"
+            aria-label="Toggle navigation"
+            aria-expanded={mobileOpen}
+          >
+            {mobileOpen ? <X className="h-4 w-4" aria-hidden /> : <Menu className="h-4 w-4" aria-hidden />}
+          </button>
+        </nav>
 
-      <section className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-16 sm:px-8 sm:pt-24 lg:px-10 lg:pb-28">
-        <div className="mx-auto max-w-4xl text-center">
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springCard, delay: 0.04 }}><Pill><span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-emerald-300 shadow-[0_0_9px_rgba(110,231,183,0.9)]" /> Aegis Cloud is live</Pill></motion.div>
-          <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springCard, delay: 0.10 }} className="mx-auto mt-7 max-w-4xl text-5xl font-semibold tracking-[-0.075em] text-white sm:text-7xl lg:text-[84px] lg:leading-[0.98]">Ship faster.<br /><span className="bg-gradient-to-r from-cyan-200 via-white to-emerald-200 bg-clip-text text-transparent">Leak nothing.</span></motion.h1>
-          <motion.p initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springCard, delay: 0.15 }} className="mx-auto mt-7 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">The zero-trust defense platform for modern engineering teams. Aegis catches secrets locally, blocks risky pull requests, and gives your team a calm, encrypted place to manage them.</motion.p>
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ ...springCard, delay: 0.20 }} className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row"><motion.a href="/dashboard" whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.98 }} transition={springInteraction} className="group flex w-full items-center justify-center gap-2 rounded-xl border border-cyan-200/25 bg-cyan-300/[0.13] px-5 py-3 text-sm font-semibold text-cyan-50 transition-all duration-200 ease-out hover:bg-cyan-300/[0.19] sm:w-auto">Launch Dashboard <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" /></motion.a><a href="/dashboard?tour=1" className="flex w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.06] px-5 py-3 text-sm text-emerald-100 transition-all duration-200 ease-out hover:bg-emerald-300/[0.12] sm:w-auto"><span aria-hidden className="text-[13px] leading-none">✨</span> Launch Guided Tour</a><a href="/dashboard/code-auditor" className="flex w-full items-center justify-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.03] px-5 py-3 text-sm text-zinc-300 transition-all duration-200 ease-out hover:bg-white/[0.07] sm:w-auto"><Code2 className="h-4 w-4" /> Try Code Auditor</a></motion.div>
-        </div>
-        <div id="product" className="relative mt-12 scroll-mt-10 sm:mt-16"><div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-300/[0.08] blur-[100px]" /><SandboxWidget /></div>
-        <div className="mt-5 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 font-mono text-[10px] uppercase tracking-[0.16em] text-zinc-500"><span className="flex items-center gap-1.5"><LockKeyhole className="h-3 w-3 text-emerald-300/70" /> local-first</span><span className="flex items-center gap-1.5"><Radar className="h-3 w-3 text-cyan-300/70" /> entropy aware</span><span className="flex items-center gap-1.5"><Cloud className="h-3 w-3 text-zinc-500" /> encrypted cloud</span></div>
-      </section>
+        {mobileOpen && (
+          <div className="relative z-20 mx-5 flex flex-col gap-1 rounded-2xl border border-white/[0.10] bg-[#0f1420]/95 p-2 backdrop-blur-xl md:hidden">
+            {[
+              { id: "product", label: "Product" },
+              { id: "surfaces", label: "Surfaces" },
+              { id: "pricing", label: "Pricing" },
+            ].map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => scrollTo(item.id)}
+                className="min-h-11 cursor-pointer rounded-xl px-3 text-left text-sm text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
+              >
+                {item.label}
+              </button>
+            ))}
+            <a
+              href="/dashboard"
+              className="flex min-h-11 items-center rounded-xl px-3 text-sm font-semibold text-cyan-100 transition-colors hover:bg-cyan-300/[0.10]"
+            >
+              Open dashboard
+            </a>
+          </div>
+        )}
 
-      <section id="workflow" className="relative z-10 mx-auto max-w-6xl scroll-mt-8 px-5 py-16 sm:px-8 sm:py-24"><div className="mb-10 max-w-xl"><Pill tone="cyan">The calm path to secure</Pill><h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-white sm:text-5xl">Security that feels like part of the flow.</h2><p className="mt-5 text-sm leading-7 text-zinc-400 sm:text-base">No scripts to clone. No configuration maze. Connect your repository, keep secrets in the Vault, and let Aegis make the secure path the easiest path.</p></div><GitHubShowcase /></section>
+        <section className="relative mx-auto max-w-7xl px-5 pb-16 pt-14 sm:px-8 sm:pt-20 lg:px-10 lg:pb-24">
+          <div className="mx-auto max-w-3xl text-center">
+            <h1 className="mx-auto max-w-3xl text-5xl font-semibold tracking-[-0.06em] text-white sm:text-6xl lg:text-7xl">
+              Commit clean.
+              <br />
+              <span className="text-cyan-200">Leak nothing.</span>
+            </h1>
+            <p className="mx-auto mt-6 max-w-2xl text-sm leading-7 text-zinc-400 sm:text-base">
+              Aegis scans staged diffs before they leave your machine, streams repository scans through the GitHub
+              REST API, and traces links hop by hop before any request runs. The same engine runs in the CLI, the
+              dashboard, and the sandbox below.
+            </p>
+            <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+              <a
+                href="/dashboard"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-cyan-200/25 bg-cyan-300/[0.13] px-5 text-sm font-semibold text-cyan-50 transition-colors hover:bg-cyan-300/[0.19] sm:w-auto"
+              >
+                Open the dashboard
+              </a>
+              <a
+                href="/dashboard?tour=1"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/[0.06] px-5 text-sm text-emerald-100 transition-colors hover:bg-emerald-300/[0.12] sm:w-auto"
+              >
+                <PlayCircle className="h-4 w-4" aria-hidden />
+                Run the 5-tab tour
+              </a>
+              <a
+                href="/dashboard/code-auditor"
+                className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-white/[0.10] bg-white/[0.03] px-5 text-sm text-zinc-300 transition-colors hover:bg-white/[0.07] sm:w-auto"
+              >
+                <Code2 className="h-4 w-4" aria-hidden />
+                Open the code sandbox
+              </a>
+            </div>
+            <p className="mt-5 font-mono text-[11px] text-zinc-400">
+              27 signatures / H ≥ 4.55 / 20 files per repo scan
+            </p>
+          </div>
 
-      <section className="relative z-10 mx-auto grid max-w-6xl gap-4 px-5 py-8 sm:grid-cols-3 sm:px-8 sm:py-16">
-        {[
-          { icon: <Code2 className="h-4 w-4" />, label: "01 / Detect", title: "Entropy over regex", copy: "Find the credential that looks almost like normal code, before it becomes an incident." },
-          { icon: <KeyRound className="h-4 w-4" />, label: "02 / Protect", title: "Vault without friction", copy: "Encrypted references replace brittle local .env rituals while keeping developers in control." },
-          { icon: <BadgeCheck className="h-4 w-4" />, label: "03 / Prove", title: "Evidence for every merge", copy: "A clear PR decision, remediation diff, and audit trail your security team can trust." },
-        ].map((item, index) => <motion.div key={item.label} initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.3 }} transition={{ ...springCard, delay: index * 0.08 }} className="rounded-[22px] border border-white/[0.09] bg-[#0f1420]/60 p-5"><div className="mb-12 flex items-center justify-between"><div className="flex h-8 w-8 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-300/[0.07] text-cyan-200">{item.icon}</div><span className="font-mono text-[10px] text-zinc-500">{item.label}</span></div><h3 className="text-base font-semibold tracking-[-0.02em] text-white">{item.title}</h3><p className="mt-2 text-xs leading-5 text-zinc-400">{item.copy}</p></motion.div>)}
-      </section>
+          <div id="product" className="mt-12 scroll-mt-10 sm:mt-16">
+            <SandboxWidget />
+          </div>
+          <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[11px] text-zinc-400">
+            <span>git diff --cached</span>
+            <span aria-hidden className="text-zinc-600">/</span>
+            <span>H ≥ 4.55</span>
+            <span aria-hidden className="text-zinc-600">/</span>
+            <span>SSRF pre-flight</span>
+          </div>
+        </section>
 
-      <PricingSection />
+        <section id="surfaces" className="relative mx-auto max-w-6xl scroll-mt-10 px-5 py-16 sm:px-8 sm:py-24">
+          <div className="mb-8 max-w-2xl">
+            <p className="font-mono text-[11px] text-zinc-400">Runtime surfaces</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+              Three surfaces, one scanner.
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-zinc-400 sm:text-base">
+              The same entropy and signature engine runs in the pre-commit hook, the dashboard, and the browser
+              sandbox.
+            </p>
+          </div>
 
-      <footer className="relative z-10 border-t border-white/[0.08] px-5 py-8 sm:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-zinc-500 sm:flex-row sm:items-center sm:justify-between"><Wordmark /><span>© 2026 Project Aegis · built for teams that ship.</span><a href="/dashboard" className="flex items-center gap-1.5 text-zinc-400 transition hover:text-white">Open dashboard <ArrowRight className="h-3 w-3" /></a></div></footer>
-    </main>
+          <div className="border-t border-white/[0.08]">
+            {SURFACES.map((surface) => {
+              const Icon = surface.icon;
+              return (
+                <div
+                  key={surface.id}
+                  className="grid gap-4 border-b border-white/[0.08] py-6 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] md:items-start"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg border border-white/[0.10] text-zinc-300">
+                      <Icon className="h-4 w-4" aria-hidden />
+                    </span>
+                    <div>
+                      <div className="font-mono text-xs text-zinc-100">{surface.name}</div>
+                      <div className="mt-1 font-mono text-[10px] text-zinc-400">{surface.trigger}</div>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs leading-6 text-zinc-400">{surface.detail}</p>
+                    <code className="mt-2 inline-block rounded-lg border border-white/[0.08] bg-[#07090e] px-2 py-1 font-mono text-[10px] text-cyan-200">
+                      {surface.code}
+                    </code>
+                  </div>
+                  <a
+                    href={surface.href}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/[0.10] bg-white/[0.03] px-4 text-xs font-semibold text-zinc-200 transition-colors hover:border-cyan-300/30 hover:text-cyan-100"
+                  >
+                    {surface.cta}
+                  </a>
+                </div>
+              );
+            })}
+          </div>
+
+          <GitHubShowcase />
+        </section>
+
+        <section id="pricing" className="relative mx-auto max-w-6xl scroll-mt-10 px-5 py-20 sm:px-8 sm:py-28">
+          <div className="max-w-2xl">
+            <h2 className="text-3xl font-semibold tracking-[-0.04em] text-white sm:text-4xl">
+              Start with the CLI. Add the dashboard when you need it.
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-zinc-400 sm:text-base">
+              The CLI runs offline with no dependencies. The dashboard adds live repository scans, SafeLink, and the
+              vault.
+            </p>
+          </div>
+
+          <div className="mt-10 border-t border-white/[0.08]">
+            {PRICING.map((tier) => (
+              <div
+                key={tier.name}
+                className="grid gap-5 border-b border-white/[0.08] py-6 sm:grid-cols-[190px_minmax(0,1fr)_auto] sm:items-start"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-white">{tier.name}</h3>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="font-mono text-2xl tabular-nums tracking-[-0.04em] text-white">{tier.price}</span>
+                    {tier.suffix && <span className="font-mono text-[10px] text-zinc-400">{tier.suffix}</span>}
+                  </div>
+                  <p className="mt-1 text-[11px] text-zinc-400">{tier.audience}</p>
+                </div>
+                <ul className="grid gap-2 text-xs text-zinc-300 sm:grid-cols-2">
+                  {tier.features.map((feature) => (
+                    <li key={feature} className="flex gap-2">
+                      <span aria-hidden className="font-mono text-zinc-600">/</span>
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <a
+                  href={tier.href}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/[0.10] bg-white/[0.03] px-4 text-xs font-semibold text-zinc-200 transition-colors hover:border-cyan-300/30 hover:text-cyan-100"
+                >
+                  {tier.cta}
+                </a>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 font-mono text-[10px] text-zinc-400">Demo pricing. Checkout is simulated.</p>
+        </section>
+
+        <footer className="relative z-10 border-t border-white/[0.08] px-5 py-8 sm:px-8">
+          <div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-zinc-400 sm:flex-row sm:items-center sm:justify-between">
+            <Wordmark />
+            <span>© 2026 Project Aegis. GitShield CLI, dashboard, SafeLink.</span>
+            <a href="/dashboard" className="flex items-center gap-1.5 transition-colors hover:text-white">
+              Open dashboard
+            </a>
+          </div>
+        </footer>
+      </main>
+    </MotionConfig>
   );
 }

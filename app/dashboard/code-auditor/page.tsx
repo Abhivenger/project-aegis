@@ -2,8 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CodeDiffViewer, FindingItem, RemediationData } from "@/components/code-diff-viewer";
-import { RiskGauge } from "@/components/risk-gauge";
+import { SecurityPresets } from "@/components/security-presets";
+import { SafeLinkResult } from "@/components/safelink-result";
+import { SECURITY_PRESETS, STRIPE_PRESET, type SecurityPreset } from "@/lib/demo-presets";
+import { analyzeCode } from "@/lib/scanners/code-analysis";
+import type { UrlAnalysisReport } from "@/lib/scanners/url-analyzer";
 import { ThreatReportModal } from "@/components/threat-report-modal";
+import { GithubAuditor } from "@/components/dashboard/github-auditor";
 import { useDashboardQuota, FREE_TIER_SCAN_LIMIT } from "@/lib/quota-context";
 import {
   consumePendingPreset,
@@ -12,79 +17,48 @@ import {
   type PresetId,
 } from "@/lib/preset-bus";
 import { buildCodeThreatReport } from "@/lib/report/threat-report";
-import { Code2, Play, FileText, AlertCircle } from "lucide-react";
-
-const PRESET_STRIPE = `// Checkout payment handler
-import Stripe from 'stripe';
-
-const stripe = new Stripe("sk_live_51M0x9KLa8xX209qZ1abcdef9876543210zyxwvu", {
-  apiVersion: '2023-10-16',
-});
-
-export async function processPayment(amount: number) {
-  return await stripe.paymentIntents.create({
-    amount,
-    currency: 'usd',
-  });
-}`;
-
-const PRESET_AWS_GCP = `# Deployment secrets configuration
-AWS_ACCESS_KEY_ID = "AKIAIOSFODNN7EXAMPLE"
-AWS_SECRET_ACCESS_KEY = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-GEMINI_API_KEY = "AIzaSyD-73abcdefghijklmnopqrstuvwxyz0123"
-
-def initialize_cloud():
-    print("Connecting to cloud infrastructure...")
-`;
-
-const PRESET_CLEAN = `// Standard production client with environment variables
-export async function fetchUserData(userId: string) {
-  const token = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
-  const res = await fetch(\`https://api.github.com/user/\${userId}\`, {
-    headers: { Authorization: \`Bearer \${token}\` }
-  });
-  return res.json();
-}`;
-
-interface CodePreset {
-  id: PresetId;
-  label: string;
-  content: string;
-  filename: string;
-  buttonClass: string;
-}
-
-const CODE_PRESETS: readonly CodePreset[] = [
-  {
-    id: "stripe",
-    label: "Stripe Leak",
-    content: PRESET_STRIPE,
-    filename: "payment-handler.ts",
-    buttonClass: "text-rose-400 border-rose-900/40",
-  },
-  {
-    id: "aws",
-    label: "AWS/Gemini Leak",
-    content: PRESET_AWS_GCP,
-    filename: "cloud-credentials.py",
-    buttonClass: "text-amber-400 border-amber-900/40",
-  },
-  {
-    id: "clean",
-    label: "Clean Code",
-    content: PRESET_CLEAN,
-    filename: "clean-module.ts",
-    buttonClass: "text-emerald-400 border-emerald-900/40",
-  },
-];
+import type { LocalAiAnalysis } from "@/lib/ai/fallback";
+import { Code2, Play, FileText, AlertCircle, Sparkles } from "lucide-react";
 
 const CODE_PRESET_IDS: ReadonlySet<PresetId> = new Set(
-  CODE_PRESETS.map((preset) => preset.id)
+  SECURITY_PRESETS.map((preset) => preset.id)
 );
 
+type AiResult =
+  | { provider: "offline"; analysis: LocalAiAnalysis }
+  | { provider: "upstream"; analysis: string };
+
+function extractUpstreamText(payload: string): string {
+  const chunks: string[] = [];
+  for (const line of payload.split(/\r?\n/)) {
+    if (!line.startsWith("data:") || line.slice(5).trim() === "[DONE]") {
+      continue;
+    }
+    const data = line.slice(5).trim();
+    try {
+      const parsed: unknown = JSON.parse(data);
+      if (typeof parsed !== "object" || parsed === null) continue;
+      const choices = (parsed as { choices?: unknown }).choices;
+      if (!Array.isArray(choices) || choices.length === 0) continue;
+      const choice = choices[0];
+      if (typeof choice !== "object" || choice === null) continue;
+      const delta = (choice as { delta?: unknown }).delta;
+      if (typeof delta !== "object" || delta === null) continue;
+      const content = (delta as { content?: unknown }).content;
+      if (typeof content === "string") chunks.push(content);
+    } catch {
+      // A non-JSON provider stream is displayed as-is below.
+    }
+  }
+  return chunks.join("") || payload;
+}
+
 export default function CodeAuditorPage() {
-  const [content, setContent] = useState(PRESET_STRIPE);
-  const [filename, setFilename] = useState("payment-handler.ts");
+  const [content, setContent] = useState(STRIPE_PRESET.content);
+  const [filename, setFilename] = useState(STRIPE_PRESET.filename);
+  const [selectedPreset, setSelectedPreset] = useState<string | null>("stripe");
+  const [urlReport, setUrlReport] = useState<UrlAnalysisReport | null>(null);
+  const scanVersion = useRef(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -94,12 +68,33 @@ export default function CodeAuditorPage() {
   const [remediation, setRemediation] = useState<RemediationData | null>(null);
   const [auditedContent, setAuditedContent] = useState("");
   const [reportOpen, setReportOpen] = useState(false);
+  const [aiResult, setAiResult] = useState<AiResult | null>(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
   const quota = useDashboardQuota();
 
-  const handleAudit = async (overrideContent?: string, overrideFilename?: string) => {
+  const handleAudit = async (overrideContent?: string, overrideFilename?: string, demo = false) => {
     const contentToScan = (overrideContent ?? content).trim();
     const filenameToScan = overrideFilename ?? filename;
     if (!contentToScan) return;
+    const version = ++scanVersion.current;
+    const urlMode = /^https?:\/\//i.test(contentToScan);
+    setVerdict(null);
+    setUrlReport(null);
+    setAiResult(null);
+    setAiError(null);
+    setError(null);
+
+    if (demo && !urlMode) {
+      const result = analyzeCode(contentToScan, filenameToScan);
+      setRiskScore(result.riskScore);
+      setVerdict(result.verdict);
+      setFindings(result.findings);
+      setRemediation(result.remediation);
+      setAuditedContent(contentToScan);
+      setLoading(false);
+      return;
+    }
 
     // Free-tier hard limit: block the request entirely before any network I/O.
     // Enterprise bypasses all limits (quotaExhausted is always false there).
@@ -115,10 +110,10 @@ export default function CodeAuditorPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/scan/secret", {
+      const res = await fetch(urlMode ? "/api/scan/url" : "/api/scan/secret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ filename: filenameToScan, content: contentToScan }),
+        body: JSON.stringify(urlMode ? { url: contentToScan } : { filename: filenameToScan, content: contentToScan }),
       });
 
       const data = await res.json();
@@ -128,6 +123,11 @@ export default function CodeAuditorPage() {
 
       // Notify dashboard quota tracker that a scan completed.
       window.dispatchEvent(new Event("aegis:scan"));
+      if (scanVersion.current !== version) return;
+      if (urlMode) {
+        setUrlReport(data.report);
+        return;
+      }
 
       setRiskScore(data.riskScore);
       setVerdict(data.verdict);
@@ -135,9 +135,61 @@ export default function CodeAuditorPage() {
       setRemediation(data.remediation);
       setAuditedContent(contentToScan);
     } catch (err) {
-      setError((err as Error).message);
+      if (scanVersion.current === version) setError((err as Error).message);
     } finally {
-      setLoading(false);
+      if (scanVersion.current === version) setLoading(false);
+    }
+  };
+
+  const selectPreset = (preset: SecurityPreset) => {
+    setContent(preset.content);
+    setFilename(preset.filename);
+    setSelectedPreset(preset.id);
+    void handleAudit(preset.content, preset.filename, true);
+  };
+
+  const handleAiAnalyze = async () => {
+    const contentToAnalyze = content.trim();
+    if (!contentToAnalyze) return;
+
+    setAiLoading(true);
+    setAiError(null);
+    setAiResult(null);
+
+    try {
+      const res = await fetch("/api/ai-analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream, application/json",
+        },
+        body: JSON.stringify({
+          content: contentToAnalyze,
+          context: `Filename: ${filename}`,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(data?.error ?? "AI analysis failed.");
+      }
+
+      const mode = res.headers.get("x-aegis-analysis-mode");
+      if (mode === "offline" || res.headers.get("content-type")?.includes("application/json")) {
+        const data = (await res.json()) as { analysis?: unknown };
+        if (typeof data.analysis !== "object" || data.analysis === null) {
+          throw new Error("Offline analysis returned an invalid result.");
+        }
+        setAiResult({ provider: "offline", analysis: data.analysis as LocalAiAnalysis });
+        return;
+      }
+
+      const payload = await res.text();
+      setAiResult({ provider: "upstream", analysis: extractUpstreamText(payload) });
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI analysis failed.");
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -148,14 +200,15 @@ export default function CodeAuditorPage() {
   // Apply a pending preset from the command palette (cross-route handoff) and
   // listen for same-route preset events.
   useEffect(() => {
-    const applyPreset = (preset: CodePreset) => {
+    const applyPreset = (preset: SecurityPreset) => {
       setContent(preset.content);
       setFilename(preset.filename);
-      void scanRef.current(preset.content, preset.filename);
+      setSelectedPreset(preset.id);
+      void scanRef.current(preset.content, preset.filename, true);
     };
 
-    const findPreset = (id: PresetId): CodePreset | undefined =>
-      CODE_PRESETS.find((preset) => preset.id === id);
+    const findPreset = (id: PresetId): SecurityPreset | undefined =>
+      SECURITY_PRESETS.find((preset) => preset.id === id);
 
     const pending = consumePendingPreset();
     if (pending && CODE_PRESET_IDS.has(pending)) {
@@ -218,29 +271,25 @@ export default function CodeAuditorPage() {
             />
           </div>
 
-          {/* Quick Code Snippets */}
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Sample Leaks:</span>
-            {CODE_PRESETS.map((preset) => (
-              <button
-                key={preset.id}
-                onClick={() => {
-                  setContent(preset.content);
-                  setFilename(preset.filename);
-                }}
-                className={`text-[11px] font-mono px-2 py-0.5 rounded bg-slate-900 hover:bg-slate-800 border ${preset.buttonClass}`}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
         </div>
+
+        <SecurityPresets onSelect={selectPreset} selected={selectedPreset} />
 
         {/* Textarea Code Input */}
         <div className="relative" data-tour="code-editor">
           <textarea
             value={content}
-            onChange={(e) => setContent(e.target.value)}
+            aria-label="Code or URL to audit"
+            onChange={(e) => {
+              ++scanVersion.current;
+              setContent(e.target.value);
+              setSelectedPreset(null);
+              setVerdict(null);
+              setUrlReport(null);
+              setLoading(false);
+              setError(null);
+              setAiResult(null);
+            }}
             rows={11}
             placeholder="Paste code snippet or staged Git diff here..."
             className="w-full bg-[#030712] border border-slate-800/80 rounded-xl p-3 font-mono text-xs text-slate-200 focus:outline-none focus:border-emerald-500/50 leading-relaxed resize-y"
@@ -274,46 +323,74 @@ export default function CodeAuditorPage() {
         </div>
       )}
 
-      {/* Audit Results */}
+      {loading && <p role="status" className="text-xs text-cyan-200">Scanning for threats...</p>}
+      {urlReport && <SafeLinkResult report={urlReport} />}
       {verdict && (
         <div className="space-y-4">
-          {/* Result actions */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="text-[11px] font-mono text-emerald-400">
-              Audit complete · {findings.length} finding{findings.length === 1 ? "" : "s"}
-            </div>
-            <button
-              onClick={() => setReportOpen(true)}
-              data-tour="export-audit"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-200 text-xs font-bold transition"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Export Security Audit Report
-            </button>
+            <div role="status" className="text-[11px] text-emerald-300">Audit complete · {findings.length} finding{findings.length === 1 ? "" : "s"}</div>
+            <button onClick={() => setReportOpen(true)} data-tour="export-audit" className="flex items-center gap-2 rounded-xl border border-indigo-500/40 bg-indigo-500/10 px-4 py-2 text-xs font-bold text-indigo-200 transition-colors hover:bg-indigo-500/20"><FileText className="h-3.5 w-3.5" /> Export Security Audit Report</button>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
-            {/* Risk Gauge Readout */}
-            <div className="md:col-span-4 bg-[#060b18] border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center shadow-xl">
-              <RiskGauge score={riskScore ?? 0} verdict={verdict} size={190} />
-              <div className="mt-4 text-center">
-                <span className="text-xs text-slate-400 block font-medium">
-                  {findings.length} Credential Token{findings.length !== 1 ? "s" : ""} Flagged
-                </span>
-              </div>
-            </div>
-
-            {/* Remediation Diff Viewer Component */}
-            <div className="md:col-span-8">
-              <CodeDiffViewer
-                findings={findings}
-                remediation={remediation || undefined}
-                originalContent={content}
-              />
-            </div>
-          </div>
+          <CodeDiffViewer findings={findings} remediation={remediation || undefined} originalContent={auditedContent} filename={filename} />
         </div>
       )}
+
+      <div className="rounded-2xl border border-cyan-500/20 bg-cyan-950/10 p-4 shadow-xl">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-bold text-white">
+              <Sparkles className="h-4 w-4 text-cyan-300" />
+              AI Security Review
+            </div>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Server-side provider analysis with an instant offline entropy and signature fallback.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleAiAnalyze}
+            disabled={aiLoading || !content.trim()}
+            className="flex items-center justify-center gap-2 rounded-xl border border-cyan-400/40 bg-cyan-500/10 px-4 py-2 text-xs font-bold text-cyan-200 transition hover:bg-cyan-500/20 disabled:opacity-50"
+          >
+            <Sparkles className={`h-3.5 w-3.5 ${aiLoading ? "animate-pulse" : ""}`} />
+            {aiLoading ? "Reviewing..." : "Run AI Review"}
+          </button>
+        </div>
+        {aiError && <p className="mt-3 text-xs text-rose-300">{aiError}</p>}
+        {aiResult && (
+          <div className="mt-4 rounded-xl border border-slate-800 bg-[#030712] p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-slate-500">
+                {aiResult.provider === "offline" ? "LOCAL FALLBACK" : "UPSTREAM STREAM"}
+              </span>
+              {aiResult.provider === "offline" && (
+                <span className="text-[10px] font-mono text-emerald-300">NETWORK INDEPENDENT</span>
+              )}
+            </div>
+            {aiResult.provider === "offline" ? (
+              <div className="space-y-2 text-xs">
+                <p className="text-slate-200">{aiResult.analysis.summary}</p>
+                <p className="font-mono text-cyan-300">
+                  {aiResult.analysis.verdict} · risk {aiResult.analysis.riskScore}/100 · peak entropy {aiResult.analysis.entropy.highestEntropy.toFixed(2)}
+                </p>
+                <ul className="list-disc space-y-1 pl-4 text-slate-400">
+                  {aiResult.analysis.recommendations.map((recommendation) => (
+                    <li key={recommendation}>{recommendation}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-300">
+                {aiResult.analysis}
+              </pre>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="border-t border-slate-800/80 pt-6">
+        <GithubAuditor embedded />
+      </div>
 
       {/* Threat report export modal */}
       <ThreatReportModal

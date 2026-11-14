@@ -35,6 +35,7 @@ interface UrlPreset {
 const PRESETS: readonly UrlPreset[] = [
   { id: "github", label: "Safe Domain", url: "https://github.com" },
   { id: "phishing", label: "Phishing Pattern", url: "http://secure-login-hdfc-otp.login-auth.xyz/verify" },
+  { id: "homograph", label: "Homograph / IDN Spoof", url: "http://secure.login.verify.otp.auth.xn--pypal-4ve.com.xyz/account/update" },
   { id: "metadata", label: "Cloud Metadata SSRF", url: "http://169.254.169.254/latest/meta-data/" },
   { id: "localhost", label: "Localhost SSRF", url: "http://127.0.0.1:5432" },
 ];
@@ -241,7 +242,7 @@ export default function UrlInspectorPage() {
 
       {/* Scan Results Layout */}
       {report && (
-        <div className="space-y-4">
+        <div data-tour="url-report" className="space-y-4">
           {/* Result actions */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-400">

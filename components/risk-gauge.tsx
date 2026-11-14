@@ -69,7 +69,7 @@ export function RiskGauge({
       <div className="relative" style={{ width: size, height: size }}>
         {/* Glow backdrop */}
         <div
-          className="absolute inset-0 rounded-full blur-xl pointer-events-none transition-all duration-700"
+           className="absolute inset-0 rounded-full blur-xl pointer-events-none transition-[background-color] duration-200 ease-out"
           style={{ backgroundColor: colors.bgGlow }}
         />
 
@@ -99,7 +99,7 @@ export function RiskGauge({
             strokeDasharray={circumference}
             strokeDashoffset={strokeDashoffset}
             strokeLinecap="round"
-            className="transition-all duration-1000 ease-out"
+             className="transition-[stroke-dashoffset,stroke] duration-500 ease-out"
           />
         </svg>
 

@@ -45,8 +45,7 @@ export async function POST(req: Request) {
     };
     try {
       quota = await checkAndIncrementQuota(authContext.userId);
-    } catch (quotaError) {
-      console.error('[scan/url] Quota check failed (fail-open):', quotaError);
+    } catch {
     }
     if (!quota.allowed) {
       return NextResponse.json(
@@ -76,9 +75,7 @@ export async function POST(req: Request) {
     // Skipped entirely when Supabase is not configured (client is null).
     const supabase = getServiceSupabase();
     if (supabase) {
-      void supabase
-        .from('scans')
-        .insert({
+      void supabase.from('scans').insert({
           user_id: authContext.userId,
           scan_type: 'url',
           target: targetUrl,
@@ -87,18 +84,7 @@ export async function POST(req: Request) {
           summary: `SafeLink classified URL as ${report.verdict} with risk score ${report.riskScore}/100.`,
           details: report,
         })
-        .then(
-          ({ error: insertError }) => {
-            if (insertError) {
-              console.error('[scan/url] Audit insert failed:', insertError.message);
-            }
-          },
-          (unexpected: unknown) => {
-            console.error('[scan/url] Audit insert threw:', unexpected);
-          }
-        );
-    } else {
-      console.warn('[scan/url] Supabase not configured - skipping audit log.');
+        .then(() => undefined, () => undefined);
     }
 
     return NextResponse.json({

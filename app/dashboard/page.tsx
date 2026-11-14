@@ -1,10 +1,11 @@
-import { redirect } from 'next/navigation';
+import { GithubAuditor } from "@/components/dashboard/github-auditor";
 
-/**
- * Dashboard root. There is no dedicated landing page, so `/dashboard` forwards
- * straight to the primary SafeLink engine. This keeps
- * http://localhost:3000/dashboard working without any auth handshake.
- */
+export const metadata = {
+  title: "Live GitHub Repository Scanner — Project Aegis",
+  description:
+    "Fetch a public GitHub repository through the GitHub REST API and audit its highest-risk files for exposed secrets.",
+};
+
 export default function DashboardIndexPage() {
-  redirect('/dashboard/url-inspector');
+  return <GithubAuditor />;
 }

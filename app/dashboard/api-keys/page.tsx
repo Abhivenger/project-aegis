@@ -110,7 +110,10 @@ export default function ApiKeysPage() {
       </div>
 
       {/* CLI Instruction Banner */}
-      <div className="p-4 rounded-2xl bg-[#060b18] border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xl">
+      <div
+        data-tour="cli-banner"
+        className="p-4 rounded-2xl bg-[#060b18] border border-slate-800 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-xl"
+      >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center flex-shrink-0">
             <Terminal className="w-5 h-5" />

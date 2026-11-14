@@ -7,7 +7,7 @@ import { SpotlightCard } from '@/components/ui/spotlight-card';
 import { UserMenu } from '@/components/user-menu';
 import { MockCheckoutModal } from '@/components/mock-checkout-modal';
 import { CommandPalette } from '@/components/command-palette';
-import { DemoTour } from '@/components/demo-tour';
+import { DemoTour } from '@/components/dashboard/demo-tour';
 import { startDemoTour } from '@/lib/tour-bus';
 import { QuotaContext, type DashboardQuotaState } from '@/lib/quota-context';
 import {
@@ -26,6 +26,7 @@ import {
   Shield,
   Globe,
   Code2,
+  Github,
   Key,
   Menu,
   X,
@@ -38,6 +39,7 @@ import {
   Terminal,
   Command,
   CircleDot,
+  LockKeyhole,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -118,6 +120,12 @@ export default function DashboardLayout({
 
   const navItems = [
     {
+      name: 'GitHub Repo Scanner',
+      href: '/dashboard',
+      icon: Github,
+      badge: 'Live API',
+    },
+    {
       name: 'SafeLink URL Inspector',
       href: '/dashboard/url-inspector',
       icon: Globe,
@@ -134,6 +142,12 @@ export default function DashboardLayout({
       href: '/dashboard/api-keys',
       icon: Key,
       badge: 'CLI Hook',
+    },
+    {
+      name: 'Web Vault',
+      href: '/dashboard/vault',
+      icon: LockKeyhole,
+      badge: 'Encrypted',
     },
   ];
 
@@ -180,10 +194,10 @@ export default function DashboardLayout({
   ];
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-100 flex flex-col md:flex-row antialiased">
+    <div className="min-h-screen bg-[#030712] text-zinc-100 flex flex-col md:flex-row antialiased">
       {/* Mobile Top Header */}
       <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#060b18] border-b border-slate-800">
-        <Link href="/dashboard/url-inspector" className="flex items-center gap-2">
+        <Link href="/dashboard" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
             <Shield className="w-4 h-4 text-white" />
           </div>
@@ -193,7 +207,7 @@ export default function DashboardLayout({
           <UserMenu compact />
           <button
             onClick={() => setMobileNavOpen(!mobileNavOpen)}
-            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300"
+            className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-zinc-300"
           >
             {mobileNavOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -224,7 +238,7 @@ export default function DashboardLayout({
 
           {/* Navigation Links */}
           <nav className="p-3 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-slate-400 px-3 tracking-wider block mb-2">
+            <span className="text-[10px] uppercase font-bold text-zinc-400 px-3 tracking-wider block mb-2">
               Security Engines
             </span>
 
@@ -239,11 +253,11 @@ export default function DashboardLayout({
                   className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition ${
                     isActive
                       ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/10 text-cyan-400 border border-cyan-500/30'
-                      : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-slate-900/60'
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-slate-400'}`} />
+                    <Icon className={`w-4 h-4 ${isActive ? 'text-cyan-400' : 'text-zinc-400'}`} />
                     <span>{item.name}</span>
                   </div>
                 </Link>
@@ -253,13 +267,13 @@ export default function DashboardLayout({
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
-              className="w-full mt-1 flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 text-slate-400 text-xs font-semibold transition"
+              className="w-full mt-1 flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl bg-slate-900/60 border border-slate-800 hover:bg-slate-900 text-zinc-400 text-xs font-semibold transition"
             >
               <span className="flex items-center gap-2.5">
                 <Terminal className="w-4 h-4 text-cyan-400" />
                 Command Palette
               </span>
-              <span className="flex items-center gap-0.5 font-mono text-[10px] text-slate-500 border border-slate-700 rounded px-1 py-0.5">
+              <span className="flex items-center gap-0.5 font-mono text-[10px] text-zinc-500 border border-slate-700 rounded px-1 py-0.5">
                 <Command className="w-2.5 h-2.5" />K
               </span>
             </button>
@@ -271,7 +285,7 @@ export default function DashboardLayout({
           {/* Daily Quota Tracker */}
           <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800">
             <div className="flex justify-between items-center text-xs mb-1.5">
-              <span className="text-slate-400 font-medium flex items-center gap-1">
+              <span className="text-zinc-400 font-medium flex items-center gap-1">
                 <Activity className="w-3.5 h-3.5 text-cyan-400" />
                 Daily Scan Quota
               </span>
@@ -282,11 +296,11 @@ export default function DashboardLayout({
 
             <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-all duration-500"
+                 className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 transition-[width] duration-500 ease-out"
                 style={{ width: `${quotaPercent}%` }}
               />
             </div>
-            <div className="text-[10px] text-slate-400 mt-1.5 flex justify-between">
+            <div className="text-[10px] text-zinc-400 mt-1.5 flex justify-between">
               <span className={isUnlimited ? 'text-amber-400 font-semibold' : ''}>{tierName}</span>
               <span>Resets in 24h</span>
             </div>
@@ -314,11 +328,31 @@ export default function DashboardLayout({
       <main className="flex-1 min-h-screen overflow-x-hidden p-4 pb-20 sm:p-6 sm:pb-20 md:p-8 md:pb-20">
         <div className="max-w-6xl mx-auto space-y-6">
           <QuotaContext.Provider value={quotaContextValue}>
+          {/* Console header: page-level identity + the guided tour entry point */}
+          <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-zinc-500">
+                Aegis Console
+              </p>
+              <p className="mt-1 text-lg font-semibold tracking-tight text-white">
+                Security operations
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={startDemoTour}
+              className="flex shrink-0 items-center justify-center gap-1.5 self-start rounded-full border border-white/[0.08] bg-white/[0.02] px-3.5 py-1.5 text-[11px] font-semibold text-zinc-200 shadow-[inset_0_0_14px_rgba(52,211,153,0.10)] backdrop-blur-xl transition-all duration-200 ease-out hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-200 sm:self-auto"
+            >
+              <span aria-hidden className="text-[12px] leading-none">✨</span>
+              Interactive Tour
+            </button>
+          </header>
+
           {/* Cyber Bento Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">            {bentoCards.map((card) => {
               const Icon = card.icon;
-              return (
-                <SpotlightCard key={card.title} glowColor={card.glowColor}>
+              const inner = (
+                <SpotlightCard glowColor={card.glowColor} className="h-full">
                   <div className="p-5 space-y-3">
                     <div className="flex items-center justify-between">
                       <div
@@ -327,7 +361,7 @@ export default function DashboardLayout({
                       >
                         <Icon className={`h-4 w-4 ${card.accent}`} />
                       </div>
-                      <span className="text-[9px] font-mono uppercase tracking-widest text-slate-500">
+                      <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-500">
                         {card.unit}
                       </span>
                     </div>
@@ -339,9 +373,16 @@ export default function DashboardLayout({
                       <div className="text-sm font-bold text-white mt-0.5">{card.title}</div>
                     </div>
 
-                    <p className="text-[11px] text-slate-400 leading-relaxed">{card.desc}</p>
+                    <p className="text-[11px] text-zinc-400 leading-relaxed">{card.desc}</p>
                   </div>
                 </SpotlightCard>
+              );
+              return card.title === 'Pre-Commit Hooks' ? (
+                <div key={card.title} data-tour="cli-defense" className="h-full">
+                  {inner}
+                </div>
+              ) : (
+                <React.Fragment key={card.title}>{inner}</React.Fragment>
               );
             })}
           </div>
@@ -366,24 +407,24 @@ export default function DashboardLayout({
               <GitCommitHorizontal className="w-3 h-3" />
               GITSHIELD: ACTIVE
             </span>
-            <span className="hidden lg:flex items-center gap-1.5 text-slate-500 whitespace-nowrap">
+            <span className="hidden lg:flex items-center gap-1.5 text-zinc-500 whitespace-nowrap">
               <CircleDot className="w-3 h-3 text-slate-600" />
               LOCAL REPO MONITOR: LIVE
             </span>
             <button
               type="button"
               onClick={startDemoTour}
-              aria-label="Start the guided demo tour"
-              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-cyan-400/50 bg-cyan-500/10 px-2.5 py-1 font-semibold text-cyan-200 shadow-[0_0_14px_rgba(34,211,238,0.4)] transition hover:bg-cyan-500/20 hover:shadow-[0_0_22px_rgba(34,211,238,0.6)]"
+              aria-label="Start the interactive product tour"
+              className="flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.02] px-2.5 py-1 font-semibold text-zinc-300 shadow-[inset_0_0_14px_rgba(52,211,153,0.10)] transition-all duration-200 ease-out hover:border-emerald-400/30 hover:bg-emerald-400/10 hover:text-emerald-200"
             >
-              <span className="text-[11px] leading-none">🎬</span>
-              <span className="tracking-wide">Demo Tour</span>
+              <span className="text-[11px] leading-none">✨</span>
+              <span className="tracking-wide">Interactive Tour</span>
             </button>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            <span className="text-slate-400 whitespace-nowrap">
+            <span className="text-zinc-400 whitespace-nowrap">
               QUOTA{' '}
-              <span className="text-slate-200">
+              <span className="text-zinc-200">
                 {isUnlimited ? '∞' : `${quota.dailyScanCount}/${quota.maxDailyQuota}`}
               </span>
             </span>
@@ -399,7 +440,7 @@ export default function DashboardLayout({
             <button
               type="button"
               onClick={() => setPaletteOpen(true)}
-              className="hidden sm:flex items-center gap-1 text-slate-400 hover:text-slate-200 border border-slate-800 hover:border-slate-700 rounded px-1.5 py-0.5 transition"
+              className="hidden sm:flex items-center gap-1 text-zinc-400 hover:text-zinc-200 border border-slate-800 hover:border-slate-700 rounded px-1.5 py-0.5 transition"
               aria-label="Open command palette"
             >
               <Command className="w-3 h-3" />K

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd /c/Users/Kanankar/Documents/ProjectAegis && git status --short | head -30 && ls && cat package.json && find . -path ./node_modules -prune -o -path ./.next -prune -o -path ./.git -prune -o -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" -o -name \"*.css\" \\\\\\) -print | head -100)",
+      "Bash(cd /c/Users/Kanankar/Documents/ProjectAegis && cat app/page.tsx && cat components/landing/aegis-landing.tsx)",
+      "Bash(cd /c/Users/Kanankar/Documents/ProjectAegis && cat app/dashboard/code-auditor/page.tsx && cat components/code-diff-viewer.tsx && cat app/api/scan/secret/route.ts && cat app/api/scan/url/route.ts && cat lib/scanners/regex-patterns.ts && cat app/layout.tsx && cat lib/preset-bus.ts)",
+      "Bash(cd /c/Users/Kanankar/Documents/ProjectAegis && wc -l app/dashboard/code-auditor/page.tsx components/code-diff-viewer.tsx app/api/scan/secret/route.ts app/api/scan/url/route.ts app/globals.css && sed -n '1,260p' app/dashboard/code-auditor/page.tsx)",
+      "Bash(cd /c/Users/Kanankar/Documents/ProjectAegis && sed -n '260,490p' app/dashboard/code-auditor/page.tsx && sed -n '1,245p' components/code-diff-viewer.tsx && cat app/api/scan/secret/route.ts && cat app/api/scan/url/route.ts && cat lib/scanners/regex-patterns.ts && cat lib/scanners/entropy.ts)",
+      "Bash(git status --short | head -30; echo ---; ls; echo ---; cat package.json; echo ---; find . -path ./node_modules -prune -o -path ./.next -prune -o -path ./.git -prune -o -type f -print | grep -E '\\\\.\\(ts|tsx|js|mjs|css|json\\)$' | head -200)",
+      "Bash(wc:*)"
+    ]
+  }
+}

@@ -3,12 +3,13 @@ import React from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import { AppAuthProvider } from '@/lib/auth/app-auth';
 import { getClerkPublishableKey } from '@/lib/auth/clerk-config';
+import { Toaster } from 'sonner';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Project Aegis — Cyber Defense Platform',
+  title: 'Aegis Cloud — Ship faster. Leak nothing.',
   description:
-    'SafeLink SSRF-safe URL inspection and GitShield secret scanning with automated remediation.',
+    'Zero-trust secret defense for modern engineering teams: entropy-aware scanning, GitHub PR protection, and an encrypted Web Vault.',
 };
 
 export default function RootLayout({
@@ -25,7 +26,22 @@ export default function RootLayout({
   const app = (
     <AppAuthProvider clerkEnabled={publishableKey !== null}>
       <html lang="en">
-        <body className="bg-[#030712] text-slate-100 antialiased">{children}</body>
+        <body className="bg-[#07090E] text-slate-100 antialiased">
+          {children}
+          <Toaster
+            position="bottom-right"
+            theme="dark"
+            richColors
+            closeButton
+            toastOptions={{
+              className: 'border-white/[0.10] text-slate-100',
+              style: {
+                background: '#101722',
+                borderColor: 'rgba(255,255,255,0.10)',
+              },
+            }}
+          />
+        </body>
       </html>
     </AppAuthProvider>
   );

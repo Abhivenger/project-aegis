@@ -55,6 +55,29 @@ LOCAL_PATTERNS = [
     (r"(-----BEGIN (?:RSA )?PRIVATE KEY-----)", "RSA Private Key"),
 ]
 
+# Lockfiles and vendored agent skill docs are generated/vendored content, not
+# hand-written source; scanning them only produces noise.
+IGNORED_FILENAMES = frozenset({
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "skills-lock.json",
+})
+IGNORED_PATH_SEGMENTS = frozenset({".agents"})
+
+# Opt-out marker for intentional test fixtures and demo values.
+IGNORE_MARKER = re.compile(r"(?:#|//)\s*aegis-ignore(?:-line)?\b")
+
+
+def is_ignored_path(filename: str) -> bool:
+    """True for lockfiles and files under ignored directories (e.g. .agents/)."""
+    if not filename:
+        return False
+    parts = filename.replace("\\", "/").split("/")
+    if parts[-1] in IGNORED_FILENAMES:
+        return True
+    return any(part in IGNORED_PATH_SEGMENTS for part in parts[:-1])
+
 
 def calculate_shannon_entropy(data: str) -> float:
     """Calculates Shannon entropy in bits per character."""
@@ -106,15 +129,23 @@ def get_staged_diff() -> str:
 
 
 def parse_staged_lines(diff_text: str):
-    """Parses git unified diff to locate staged file names and added lines."""
+    """Parses git unified diff to locate staged file names and added lines.
+
+    Lockfiles, .agents/ docs, and lines carrying an `# aegis-ignore` or
+    `// aegis-ignore` marker are dropped so the hook only inspects real leaks.
+    """
     staged_items = []
     current_file = None
+    skip_file = False
 
     for line in diff_text.splitlines():
         if line.startswith("+++ b/"):
             current_file = line[6:]
-        elif line.startswith("+") and not line.startswith("+++"):
+            skip_file = is_ignored_path(current_file)
+        elif not skip_file and line.startswith("+") and not line.startswith("+++"):
             code_line = line[1:]
+            if IGNORE_MARKER.search(code_line):
+                continue
             staged_items.append((current_file, code_line))
     return staged_items
 
@@ -427,7 +458,9 @@ def main():
 
     api_key = os.getenv("AEGIS_API_KEY")
     server_findings = None
-    if api_key:
+    # Skip the cloud scan when nothing scannable is staged, so ignored files
+    # cannot be re-reported by the server.
+    if api_key and staged_items:
         server_findings = run_cloud_audit(api_key, args.endpoint, diff)
 
     # Prioritize server report if available, else local

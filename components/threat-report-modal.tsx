@@ -75,8 +75,8 @@ export function ThreatReportModal({ isOpen, onClose, report }: ThreatReportModal
       await navigator.clipboard.writeText(payload);
       setCopied(kind);
       setTimeout(() => setCopied(null), 2000);
-    } catch (error) {
-      console.error("Failed to copy audit report", error);
+    } catch {
+      setCopied(null);
     }
   };
 

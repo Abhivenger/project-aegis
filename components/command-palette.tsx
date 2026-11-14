@@ -65,8 +65,8 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
     () => [
       {
         id: "start-tour",
-        label: "Start Guided Demo Tour",
-        hint: "5-step cinematic walkthrough for recordings",
+        label: "Start Interactive Tour",
+        hint: "5-tab walkthrough across every dashboard engine",
         group: "Navigation",
         icon: Clapperboard,
         keywords: ["tour", "demo", "walkthrough", "guide", "record", "video", "presentation"],
@@ -155,6 +155,15 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
         icon: ShieldAlert,
         keywords: ["phishing", "login", "otp", "url", "preset"],
         run: () => runPreset("phishing", "/dashboard/url-inspector"),
+      },
+      {
+        id: "preset-homograph",
+        label: "Inspect Homograph / IDN Spoof",
+        hint: "URL Inspector · instant preset",
+        group: "Instant Presets",
+        icon: ShieldAlert,
+        keywords: ["homograph", "idn", "punycode", "lookalike", "url", "preset"],
+        run: () => runPreset("homograph", "/dashboard/url-inspector"),
       },
       {
         id: "preset-localhost",

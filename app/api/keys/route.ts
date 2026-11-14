@@ -27,8 +27,7 @@ async function resolveUserId(req: Request, fallbackUserId = 'local-operator-001'
   try {
     const context = await resolveAuthContextOrFallback(req);
     return context.userId;
-  } catch (err) {
-    console.warn('[keys] auth resolution failed during key management, using fallback userId:', err);
+  } catch {
     return fallbackUserId;
   }
 }

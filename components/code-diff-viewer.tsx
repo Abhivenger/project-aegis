@@ -3,6 +3,8 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion } from "motion/react";
+import { toast } from "sonner";
+import { VulnerabilityCard } from "@/components/vulnerability-card";
 import {
   Copy,
   Check,
@@ -36,6 +38,7 @@ interface CodeDiffViewerProps {
   findings: FindingItem[];
   remediation?: RemediationData;
   originalContent?: string;
+  filename?: string;
 }
 
 // ============================================================================
@@ -434,6 +437,7 @@ export function CodeDiffViewer({
   findings,
   remediation,
   originalContent,
+  filename,
 }: CodeDiffViewerProps) {
   const [activeTab, setActiveTab] = useState<'findings' | 'env' | 'sanitized'>('findings');
   const [viewMode, setViewMode] = useState<ViewMode>('diff');
@@ -443,9 +447,11 @@ export function CodeDiffViewer({
     try {
       await navigator.clipboard.writeText(text);
       setCopiedKey(key);
+      toast.success("Sanitized config copied to clipboard!");
       setTimeout(() => setCopiedKey(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy to clipboard', err);
+    } catch {
+      toast.error("Clipboard access was denied. Select and copy the code manually.");
+      setCopiedKey(null);
     }
   };
 
@@ -463,7 +469,9 @@ export function CodeDiffViewer({
   };
 
   return (
-    <div
+    <div className="space-y-4">
+      <VulnerabilityCard findings={findings} remediation={remediation} originalContent={originalContent ?? ""} filename={filename} />
+      <div
       data-tour="remediation-diff"
       className="flex w-full flex-col overflow-hidden rounded-xl border border-slate-800 bg-[#0a101f] shadow-2xl"
     >
@@ -729,6 +737,7 @@ export function CodeDiffViewer({
             )}
           </>
         )}
+      </div>
       </div>
     </div>
   );

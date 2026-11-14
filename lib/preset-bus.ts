@@ -11,6 +11,7 @@ export type PresetId =
   | 'clean'
   | 'github'
   | 'phishing'
+  | 'homograph'
   | 'metadata'
   | 'localhost';
 
@@ -27,6 +28,7 @@ const PRESET_IDS: readonly PresetId[] = [
   'clean',
   'github',
   'phishing',
+  'homograph',
   'metadata',
   'localhost',
 ];

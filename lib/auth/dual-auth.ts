@@ -38,7 +38,6 @@ export async function resolveAuthContext(req: Request): Promise<AuthContext | nu
     if (!supabase) {
       // Database not configured: API key validation is impossible.
       // Fall through to Clerk session strategy, which may still succeed.
-      console.warn('[auth] Supabase not configured - cannot validate API keys.');
     } else {
       const { data: apiKeyRecord, error } = await supabase
         .from('api_keys')
@@ -54,7 +53,8 @@ export async function resolveAuthContext(req: Request): Promise<AuthContext | nu
       void supabase
         .from('api_keys')
         .update({ last_used_at: new Date().toISOString() })
-        .eq('id', apiKeyRecord.id);
+        .eq('id', apiKeyRecord.id)
+        .then(() => undefined, () => undefined);
 
       return {
         userId: apiKeyRecord.user_id,
@@ -97,8 +97,7 @@ export async function resolveAuthContextOrFallback(
     if (context) {
       return context;
     }
-  } catch (authError) {
-    console.warn('[auth-resolver] auth resolution failed, using fallback operator:', authError);
+  } catch {
   }
 
   return FAILED_OPEN_OPERATOR;

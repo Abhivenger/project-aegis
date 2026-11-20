@@ -18,16 +18,8 @@ Real-time secret leak detection, live GitHub repository auditing, and pre-commit
 - **Local CLI Hook:** Python pre-commit scanner (`cli/aegis.py`)
 
 ## Quick Start
-
 ```bash
-# 1. Install dependencies
+git clone https://github.com/Abhivenger/project-aegis.git
+cd project-aegis
 npm install
-
-# 2. Configure environment variables
-cp .env.example .env.local
-# Add GITHUB_TOKEN in .env.local for higher GitHub API rate limits
-
-# 3. Run in development or production mode
 npm run dev
-# or
-npm run build && npm run start
